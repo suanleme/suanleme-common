@@ -6,10 +6,6 @@ edition.workspace = true
 license.workspace = true
 description.workspace = true
 
-[[test]]
-name = "tests"
-path = "tests/config-test.rs"
-
 [dependencies]
 suanleme-macro.workspace = true
 
