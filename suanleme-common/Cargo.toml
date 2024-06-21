@@ -1,0 +1,36 @@
+[package]
+name = "suanleme-common"
+version.workspace = true
+authors.workspace = true
+edition.workspace = true
+license.workspace = true
+description.workspace = true
+
+[[test]]
+name = "tests"
+path = "tests/config-test.rs"
+
+[dependencies]
+suanleme-macro.workspace = true
+
+#网络协议处理
+tokio = { version = "1", features = ["full"] }
+
+#json序列化
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+serde_yaml = "0.9"
+
+#nacos配置中心
+nacos-sdk = { version = "0.4", features = ["default"] }
+
+#日志处理
+log = "0.4.21"
+tracing = "0.1.13"
+tracing-futures = { version = "0.2.3" }
+tracing-subscriber = "0.3"
+pretty_env_logger = "0.5"
+
+#其他
+lazy_static = "1"
+toml = "0.8"
