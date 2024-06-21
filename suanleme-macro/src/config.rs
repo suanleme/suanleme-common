@@ -17,7 +17,7 @@ pub fn hot_config(item: TokenStream) -> TokenStream {
         vec.push(e.to_token_stream());
         vec
     });
-    let de = quote! (
+    quote! (
 
         #[derive(serde::Deserialize,Debug)]
         pub struct #ident {
@@ -92,7 +92,5 @@ pub fn hot_config(item: TokenStream) -> TokenStream {
                 Some(ident)
             }
         }
-    );
-    eprintln!("{:#?}", de.to_string());
-    de.into()
+    ).into()
 }
