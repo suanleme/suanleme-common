@@ -1,4 +1,3 @@
-use fusen_rs::FusenApplicationContext;
 use serde::{Deserialize, Serialize};
 
 #[derive(Deserialize, Debug)]
