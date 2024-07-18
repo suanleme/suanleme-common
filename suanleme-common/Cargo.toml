@@ -10,23 +10,48 @@ description.workspace = true
 suanleme-macro.workspace = true
 
 #网络协议处理
-tokio = { version = "1", features = ["full"] }
+tokio = { version = "1.38.1", features = ["full"] }
 
 #json序列化
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-serde_yaml = "0.9"
+serde = { version = "1.0.204", features = ["derive"] }
+serde_json = "1.0.120"
+serde_yaml = "0.9.34"
 
 #nacos配置中心
-nacos-sdk = { version = "0.4", features = ["default"] }
+nacos-sdk = { version = "0.4.0", features = ["default"] }
 
 #日志处理
 log = "0.4.21"
 tracing = "0.1.13"
 tracing-futures = { version = "0.2.3" }
-tracing-subscriber = "0.3"
-pretty_env_logger = "0.5"
+tracing-subscriber = { version = "0.3.18", features = ["json"] }
+pretty_env_logger = "0.5.0"
+tracing-appender = "0.2.3"
 
 #其他
-lazy_static = "1"
-toml = "0.8"
+lazy_static = "1.5.0"
+toml = "0.8.15"
+uuid = { version = "1.10.0", features = ["v4"] }
+
+#时间
+chrono = "0.4.38"
+
+#redis
+redis = { version = "0.25.4", features = ["tokio-comp"] }
+
+#数据库
+sqlx = { version = "0.7.4", features = [
+    "any",
+    "runtime-tokio-native-tls",
+    "runtime-tokio",
+    "postgres",
+    "mysql",
+    "sqlite",
+] }
+
+#加解密
+rsa = "0.9.6"
+sha2 = "0.10.8"
+rand = "0.8.5"
+base64 = "0.22.1"
+ring = "0.17.8"

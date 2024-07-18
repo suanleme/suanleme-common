@@ -16,12 +16,12 @@ use crate::{
 
 #[builder]
 pub struct NacosConfig {
-    server_addr: String,
-    namespace: String,
-    group: Option<String>,
-    app_name: Option<String>,
-    username: String,
-    password: String,
+    pub server_addr: String,
+    pub namespace: Option<String>,
+    pub group: Option<String>,
+    pub app_name: Option<String>,
+    pub username: Option<String>,
+    pub password: Option<String>,
 }
 
 #[derive(Clone)]
@@ -32,7 +32,7 @@ pub struct NacosConfiguration {
 
 impl NacosConfiguration {
     pub async fn init_nacos_configuration(
-        config: NacosConfig,
+        config: Arc<NacosConfig>,
     ) -> Result<NacosConfiguration, Error> {
         let mut client_props = ClientProps::new();
         let app_name = config
@@ -41,27 +41,44 @@ impl NacosConfiguration {
             .map_or("service".to_owned(), |e| e.to_owned());
         client_props = client_props
             .server_addr(config.server_addr.clone())
-            .namespace(config.namespace.clone())
+            .namespace(
+                config
+                    .namespace
+                    .as_ref()
+                    .map_or(Default::default(), |e| e.clone()),
+            )
             .app_name(app_name.clone())
-            .auth_username(config.username.clone())
-            .auth_password(config.password.clone());
+            .auth_username(
+                config
+                    .username
+                    .as_ref()
+                    .map_or(Default::default(), |e| e.clone()),
+            )
+            .auth_password(
+                config
+                    .password
+                    .as_ref()
+                    .map_or(Default::default(), |e| e.clone()),
+            );
         let builder = ConfigServiceBuilder::new(client_props);
-        let builder = if !config.username.is_empty() {
+        let builder = if config.username.is_some() {
             builder.enable_auth_plugin_http()
         } else {
             builder
         };
         Ok(NacosConfiguration {
             config_service: Arc::new(Box::new(builder.build()?)),
-            _config: Arc::new(config),
+            _config: config,
         })
     }
 
-    pub async fn get_config<'a, T: serde::Deserialize<'a>>(
+    pub async fn get_config< T: serde::de::DeserializeOwned>(
         &self,
-        data_id: &str,
-        group: &str,
+        config: &str,
     ) -> Result<T, BoxError> {
+        let config: Vec<&str> = config.split(':').collect();
+        let data_id = config[0];
+        let group = config[1];
         let config_response = self
             .config_service
             .get_config(data_id.to_owned(), group.to_owned())
@@ -69,7 +86,38 @@ impl NacosConfiguration {
         NacosConfiguration::config_build(config_response)
     }
 
-    pub fn config_build<'a, T: serde::Deserialize<'a>>(
+    pub async fn get_receive_config< T: serde::de::DeserializeOwned + Send + 'static>(
+        &self,
+        config: &str,
+    ) -> Result<mpsc::Receiver<T>, BoxError> {
+        let ident: T = self.get_config(config).await?;
+        let config: Vec<&str> = config.split(':').collect();
+        let data_id = config[0];
+        let group = config[1];
+        let (sender, receiver) = mpsc::channel(1);
+        sender
+            .send(ident)
+            .await
+            .map_err(|e| format!("get_receive_config error : {}", e))?;
+        let (config_listener, mut listener) = HotConfigChangeListener::new();
+        self.config_service
+            .add_listener(
+                data_id.to_owned(),
+                group.to_owned(),
+                Arc::new(config_listener),
+            )
+            .await?;
+        tokio::spawn(async move {
+            while let Some(response) = listener.recv().await {
+                if let Ok(ident) = NacosConfiguration::config_build::<T>(response) {
+                    let _ = sender.send(ident).await;
+                }
+            }
+        });
+        Ok(receiver)
+    }
+
+    pub fn config_build< T: serde::de::DeserializeOwned>(
         config_response: ConfigResponse,
     ) -> Result<T, BoxError> {
         match config_response.content_type().as_str() {
@@ -79,15 +127,17 @@ impl NacosConfiguration {
         }
     }
 
-    pub async fn get_hot_config<'a, T: serde::Deserialize<'a> + HotConfig>(
+    pub async fn get_hot_config< T: serde::de::DeserializeOwned + HotConfig>(
         &self,
-        data_id: &str,
-        group: &str,
+        config: &str,
     ) -> Result<T, BoxError> {
-        let temp_ident: T = self.get_config(data_id, group).await?;
-        let mut ident: T = self.get_config(data_id, group).await?;
+        let temp_ident: T = self.get_config(config).await?;
+        let mut ident: T = self.get_config(config).await?;
         let (config_listener, receiver) = HotConfigChangeListener::new();
         ident.build_hot_config(temp_ident, receiver)?;
+        let config: Vec<&str> = config.split(':').collect();
+        let data_id = config[0];
+        let group = config[1];
         self.config_service
             .add_listener(
                 data_id.to_owned(),
@@ -99,7 +149,7 @@ impl NacosConfiguration {
     }
 }
 
-struct HotConfigChangeListener {
+pub struct HotConfigChangeListener {
     sender: mpsc::Sender<nacos_sdk::api::config::ConfigResponse>,
 }
 impl HotConfigChangeListener {
