@@ -10,5 +10,5 @@ license = "Apache-2.0"
 description = "suanleme common module"
 
 [workspace.dependencies]
-suanleme-macro = { path = "suanleme-macro", version = "0.0.1" }
-suanleme-common = { path = "suanleme-common", version = "0.0.1" }
+suanleme-macro = { path = "suanleme-macro", version = "0.0.1", registry = "kellnr" }
+suanleme-common = { path = "suanleme-common", version = "0.0.1", registry = "kellnr" }

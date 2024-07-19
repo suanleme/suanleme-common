@@ -7,6 +7,7 @@ pub mod redis;
 pub mod shutdown;
 pub mod support;
 pub mod utils;
+pub mod business;
 pub use nacos_sdk;
 pub use sqlx;
 pub type FusenFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send>>;
