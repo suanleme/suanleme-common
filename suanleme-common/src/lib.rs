@@ -10,4 +10,5 @@ pub mod utils;
 pub mod business;
 pub use nacos_sdk;
 pub use sqlx;
+pub use suanleme_macro;
 pub type FusenFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send>>;
