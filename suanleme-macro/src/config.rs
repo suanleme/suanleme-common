@@ -69,13 +69,13 @@ pub fn hot_config(item: TokenStream) -> TokenStream {
                         let sender_clone = sender_clone;
                         while let Some(config_response) = listener.recv().await {
                             let Ok(ident) = suanleme_common::nacos::NacosConfiguration::config_build(config_response) else {
-                                tracing::error!("config_build error!");
+                                suanleme_common::tracing::error!("config_build error!");
                                 continue;
                             };
                             let (sender , receive) = tokio::sync::oneshot::channel();
                             let _ = sender_clone.send((#hot_config_sender::CHANGE(ident),sender));
                             if receive.await.is_err() {
-                                tracing::error!("receive error!");
+                                suanleme_common::tracing::error!("receive error!");
                             }
                         }
                     }
