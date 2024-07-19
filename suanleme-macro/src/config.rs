@@ -41,7 +41,7 @@ pub fn hot_config(item: TokenStream) -> TokenStream {
             fn build_hot_config(
                 &mut self,
                 ident : #ident,
-                mut listener: tokio::sync::mpsc::Receiver<nacos_sdk::api::config::ConfigResponse>)
+                mut listener: tokio::sync::mpsc::Receiver<suanleme_common::nacos_sdk::api::config::ConfigResponse>)
                 -> Result<(),suanleme_common::error::BoxError> {
                 let (sender, mut receive) =
                 tokio::sync::mpsc::unbounded_channel::<(#hot_config_sender, tokio::sync::oneshot::Sender<#hot_config_receiver>)>();

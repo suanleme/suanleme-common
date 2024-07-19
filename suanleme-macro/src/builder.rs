@@ -24,7 +24,7 @@ pub fn builder(item: TokenStream) -> TokenStream {
     });
     let token = quote! {
 
-        #[derive(Default)]
+        #[derive(Default, Debug, Clone, serde::Serialize, serde::Deserialize)]
         #org_item
 
         pub struct #builder {

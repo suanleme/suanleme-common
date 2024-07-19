@@ -1,11 +1,12 @@
-pub mod log;
 pub mod config;
-pub mod nacos;
+pub mod datasource;
 pub mod error;
-pub mod utils;
+pub mod log;
+pub mod nacos;
+pub mod redis;
 pub mod shutdown;
 pub mod support;
-pub mod redis;
-pub mod datasource;
+pub mod utils;
+pub use nacos_sdk;
+pub use sqlx;
 pub type FusenFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send>>;
-
