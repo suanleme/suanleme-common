@@ -3,12 +3,12 @@ members = ["suanleme-common", "suanleme-macro"]
 resolver = "2"
 
 [workspace.package]
-version = "0.0.1"
 authors = ["kwsc98 <kwsc98@gmail.com>"]
+version = "0.0.2"
 edition = "2021"
 license = "Apache-2.0"
 description = "suanleme common module"
 
 [workspace.dependencies]
-suanleme-macro = { path = "suanleme-macro", version = "0.0.1", registry = "kellnr" }
-suanleme-common = { path = "suanleme-common", version = "0.0.1", registry = "kellnr" }
+suanleme-macro = { path = "suanleme-macro", version = "0.0.2", registry = "suanleme" }
+suanleme-common = { path = "suanleme-common", registry = "suanleme" }
