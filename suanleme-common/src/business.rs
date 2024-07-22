@@ -33,6 +33,19 @@ impl<T: Default> CommonRequest<T> {
         self.data = data;
         self
     }
+
+    pub fn get_user_id(&self) -> Option<&str> {
+        self.user_id.as_deref()
+    }
+    pub fn get_token(&self) -> Option<&str> {
+        self.token.as_deref()
+    }
+    pub fn get_sign_str(&self) -> Option<&str> {
+        self.sign_str.as_deref()
+    }
+    pub fn get_data(&self) -> Option<&T> {
+        self.data.as_ref()
+    }
 }
 
 impl<T: Default> CommonResponse<T> {
@@ -50,5 +63,15 @@ impl<T: Default> CommonResponse<T> {
     pub fn data(mut self, data: Option<T>) -> Self {
         self.data = data;
         self
+    }
+
+    pub fn get_code(&self) -> &str {
+        &self.code
+    }
+    pub fn get_message(&self) -> Option<&str> {
+        self.message.as_deref()
+    }
+    pub fn get_data(&self) -> Option<&T> {
+        self.data.as_ref()
     }
 }
