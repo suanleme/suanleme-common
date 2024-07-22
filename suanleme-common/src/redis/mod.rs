@@ -1,11 +1,30 @@
+use log::info;
 use redis::{aio::MultiplexedConnection, AsyncCommands, RedisError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
+use suanleme_macro::Data;
 
 use crate::error::BoxError;
 
-#[derive(Debug, Serialize, Deserialize)]
+pub struct Lock {
+    key: String,
+    connect: MultiplexedConnection,
+}
+
+impl Drop for Lock {
+    fn drop(&mut self) {
+        let key = self.key.clone();
+        let mut connect = self.connect.clone();
+        tokio::spawn(async move {
+            info!("Release Lock : {}", key);
+            let result: Result<String, RedisError> = connect.del::<&str, String>(&key).await;
+            info!("Release Lock Result: {} - {:?}", key, result);
+        });
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize, Default, Data)]
 pub struct RedisConfig {
     pub db: u16,
     pub host: String,
@@ -13,15 +32,17 @@ pub struct RedisConfig {
     pub password: Option<String>,
 }
 
-pub async fn init_redis_pool(config: &RedisConfig) -> Result<MultiplexedConnection, RedisError> {
+pub async fn init_redis_client(config: &RedisConfig) -> Result<RedisClient, RedisError> {
     let redis_url = if let Some(password) = &config.password {
         format!("redis://:{}@{}/{}", password, config.host, config.db)
     } else {
         format!("redis://{}/{}", config.host, config.db)
     };
-    redis::Client::open(redis_url)?
-        .get_multiplexed_tokio_connection()
-        .await
+    Ok(RedisClient {
+        connect: redis::Client::open(redis_url)?
+            .get_multiplexed_tokio_connection()
+            .await?,
+    })
 }
 
 #[derive(Clone)]
@@ -59,5 +80,32 @@ impl RedisClient {
                 .await
                 .map_err(|e| e.into())
         }
+    }
+
+    pub async fn set_nx_ex(
+        &mut self,
+        key: &str,
+        value: &str,
+        seconds: usize,
+    ) -> Result<String, BoxError> {
+        let options = redis::SetOptions::default()
+            .conditional_set(redis::ExistenceCheck::NX)
+            .with_expiration(redis::SetExpiry::EX(seconds));
+        self.connect
+            .set_options(key, value, options)
+            .await
+            .map_err(|e| e.into())
+    }
+
+    pub async fn get_lock(&mut self, key: &str, seconds: usize) -> Result<Lock, BoxError> {
+        let result = self.set_nx_ex(key, "lock", seconds).await?;
+        if !result.to_uppercase().contains("OK") {
+            info!("get lock error");
+            return Err("redis response is not ok".into());
+        };
+        Ok(Lock {
+            key: key.to_string(),
+            connect: self.connect.clone(),
+        })
     }
 }

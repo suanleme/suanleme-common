@@ -1,7 +1,12 @@
+use core::time;
 use std::{sync::Arc, time::Duration};
 
 use serde::{Deserialize, Serialize};
-use suanleme_common::{config::HotConfig, log::LogConfig};
+use suanleme_common::{
+    config::HotConfig,
+    log::LogConfig,
+    redis::{init_redis_client, RedisClient, RedisConfig},
+};
 use suanleme_macro::hot_config;
 use tracing::info;
 
@@ -40,9 +45,9 @@ pub struct PoolConfig {
 async fn test() {
     suanleme_common::log::init_log(
         &LogConfig::default()
-            .name("congif-test")
             .level("info")
             .path("/Users/kwsc98/Desktop/workspace/gitlab/suanleme-common/log"),
+        "suanleme-common",
     );
     let nacos_config = suanleme_common::nacos::NacosConfig::builder()
         .server_addr("127.0.0.1:8848".to_owned())
@@ -68,4 +73,16 @@ async fn test() {
         info!("{:?}", config2.get_hot_config().await);
         tokio::time::sleep(Duration::from_secs(2)).await;
     }
+}
+
+#[tokio::test]
+async fn test2() {
+    let mut redis_client =
+        init_redis_client(&RedisConfig::builder().host("127.0.0.1:6379".to_owned()))
+            .await
+            .unwrap();
+    let lock = redis_client.get_lock("key", 60).await.unwrap();
+    let _ = tokio::time::sleep(Duration::from_secs(10)).await;
+    drop(lock);
+    let _ = tokio::time::sleep(Duration::from_secs(1)).await;
 }
