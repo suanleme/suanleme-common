@@ -1,11 +1,9 @@
-use core::time;
-use std::{sync::Arc, time::Duration};
-
 use serde::{Deserialize, Serialize};
+use std::{sync::Arc, time::Duration};
 use suanleme_common::{
     config::HotConfig,
     log::LogConfig,
-    redis::{init_redis_client, RedisClient, RedisConfig},
+    redis::{init_redis_client, RedisConfig},
 };
 use suanleme_macro::hot_config;
 use tracing::info;

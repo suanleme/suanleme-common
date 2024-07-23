@@ -40,13 +40,10 @@ chrono = "0.4.38"
 redis = { version = "0.25.4", features = ["tokio-comp"] }
 
 #数据库
-sqlx = { version = "0.7.4", features = [
-    "any",
-    "runtime-tokio-native-tls",
-    "runtime-tokio",
+sqlx = { version = "0.8.0", features = [
+    "runtime-tokio-rustls",
     "postgres",
-    "mysql",
-    "sqlite",
+    "chrono",
 ] }
 
 #加解密
