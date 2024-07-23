@@ -14,7 +14,11 @@ pub fn data(item: TokenStream) -> TokenStream {
     let fields_builder = data_struct.fields.iter().fold(vec![], |mut vec, e| {
         let ident = e.ident.as_ref().unwrap();
         let _type = e.ty.to_token_stream();
-        let get_name = format_ident!("get_{}", ident.to_string());
+        let mut ident_name = ident.to_string();
+        if ident_name.starts_with("r#") {
+            ident_name = ident_name[2..ident_name.len()].to_string();
+        }
+        let get_name = format_ident!("get_{}", ident_name);
         vec.push(quote!(
             pub fn #ident(mut self,#ident : #_type) -> Self {
                 self.#ident = #ident;
