@@ -37,9 +37,6 @@ pub fn data(item: TokenStream) -> TokenStream {
 
             #(#fields_builder)*
 
-            pub fn builder() -> Self {
-                return Default::default();
-            }
         }
     };
     token.into()

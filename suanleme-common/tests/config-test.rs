@@ -76,7 +76,7 @@ async fn test() {
 #[tokio::test]
 async fn test2() {
     let mut redis_client =
-        init_redis_client(&RedisConfig::builder().host("127.0.0.1:6379".to_owned()))
+        init_redis_client(&RedisConfig::default().host("127.0.0.1:6379".to_owned()))
             .await
             .unwrap();
     let lock = redis_client.get_lock("key", 60).await.unwrap();
