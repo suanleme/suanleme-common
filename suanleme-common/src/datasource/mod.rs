@@ -18,11 +18,8 @@ pub async fn init_data_source(config: &DataSourceConfig) -> Result<PgPool, Error
 }
 
 pub async fn set_constraints_all_immediate(connect: &mut PgConnection) -> Result<(), BoxError> {
-    let result = query("SET CONSTRAINTS ALL IMMEDIATE")
+    query("SET CONSTRAINTS ALL IMMEDIATE")
         .execute(connect)
         .await?;
-    if result.rows_affected() != 1 {
-        return Err("set constraints all immediate".into());
-    }
     Ok(())
 }
