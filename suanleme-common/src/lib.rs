@@ -12,4 +12,5 @@ pub use nacos_sdk;
 pub use sqlx;
 pub use suanleme_macro;
 pub use tracing;
+pub use base64;
 pub type FusenFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send>>;
