@@ -13,4 +13,5 @@ pub use sqlx;
 pub use suanleme_macro;
 pub use tracing;
 pub use base64;
+pub use hyper_util;
 pub type FusenFuture<T> = std::pin::Pin<Box<dyn std::future::Future<Output = T> + Send>>;
