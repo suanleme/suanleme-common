@@ -11,6 +11,7 @@ suanleme-macro.workspace = true
 
 #网络协议处理
 tokio = { version = "1.38.1", features = ["full"] }
+hyper-util = { version = "0.1.6", features = ["full"] }
 
 #json序列化
 serde = { version = "1.0.204", features = ["derive"] }
