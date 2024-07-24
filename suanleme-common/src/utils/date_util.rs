@@ -2,12 +2,12 @@ use std::time::{SystemTime, UNIX_EPOCH};
 
 use chrono::Local;
 
-pub fn get_now_date_time_as_millis() -> i128 {
+pub fn get_now_date_time_as_millis() -> u128 {
     let start = SystemTime::now();
     let since_the_epoch = start
         .duration_since(UNIX_EPOCH)
         .expect("Time went backwards");
-    since_the_epoch.as_millis() as i128
+    since_the_epoch.as_millis()
 }
 
 pub fn get_now_date_time() -> String {
