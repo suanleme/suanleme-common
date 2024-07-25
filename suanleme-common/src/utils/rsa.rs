@@ -1,8 +1,7 @@
 use base64::{prelude::BASE64_STANDARD, Engine};
 use rand::rngs::OsRng;
 use rsa::{
-    pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
-    Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey,
+    pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey}, pkcs8::{DecodePrivateKey, DecodePublicKey}, Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey
 };
 use serde_json::Value;
 
@@ -48,6 +47,20 @@ pub fn rsa_prik_sign(prik: &str, target: &[u8]) -> Result<Vec<u8>, BoxError> {
 //rsa 公钥验签
 pub fn rsa_pubk_verify(pubk: &str, target: &[u8], sign: &[u8]) -> Result<(), BoxError> {
     let pubk = RsaPublicKey::from_pkcs1_der(&BASE64_STANDARD.decode(pubk)?)?;
+    pubk.verify(Pkcs1v15Sign::new_unprefixed(), target, sign)
+        .map_err(|e| e.into())
+}
+
+//rsa 私钥加签
+pub fn rsa_prik_sign_pkcs8(prik: &str, target: &[u8]) -> Result<Vec<u8>, BoxError> {
+    let prik = RsaPrivateKey::from_pkcs8_der(&BASE64_STANDARD.decode(prik)?)?;
+    prik.sign(Pkcs1v15Sign::new_unprefixed(), target)
+        .map_err(|e| e.into())
+}
+
+//rsa 公钥验签
+pub fn rsa_pubk_verify_pkcs8(pubk: &str, target: &[u8], sign: &[u8]) -> Result<(), BoxError> {
+    let pubk = RsaPublicKey::from_public_key_der(&BASE64_STANDARD.decode(pubk)?)?;
     pubk.verify(Pkcs1v15Sign::new_unprefixed(), target, sign)
         .map_err(|e| e.into())
 }
