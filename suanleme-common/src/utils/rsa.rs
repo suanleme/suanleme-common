@@ -6,6 +6,7 @@ use rsa::{
     Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey,
 };
 use serde_json::Value;
+use sha2::Digest;
 
 use crate::error::BoxError;
 
@@ -56,6 +57,8 @@ pub fn rsa_pubk_verify(pubk: &str, target: &[u8], sign: &[u8]) -> Result<(), Box
 //rsa 私钥加签
 pub fn rsa_sha256_prik_sign_pkcs8(prik: &str, target: &[u8]) -> Result<Vec<u8>, BoxError> {
     let prik = RsaPrivateKey::from_pkcs8_der(&BASE64_STANDARD.decode(prik)?)?;
+    let binding = sha2::Sha256::digest(target);
+    let target = binding.as_slice();
     prik.sign(Pkcs1v15Sign::new::<sha2::Sha256>(), target)
         .map_err(|e| e.into())
 }
@@ -67,6 +70,8 @@ pub fn rsa_sha256_pubk_verify_pkcs8(
     sign: &[u8],
 ) -> Result<(), BoxError> {
     let pubk = RsaPublicKey::from_public_key_der(&BASE64_STANDARD.decode(pubk)?)?;
+    let binding = sha2::Sha256::digest(target);
+    let target = binding.as_slice();
     pubk.verify(Pkcs1v15Sign::new::<sha2::Sha256>(), target, sign)
         .map_err(|e| e.into())
 }
@@ -102,11 +107,11 @@ fn test() {
     let de = rsa_prik_decrypt(&prik, &en).unwrap();
     println!("解密后数据 : {:?}", String::from_utf8(de));
     //私钥加签
-    let sign = rsa_prik_sign(&prik, "dadsdadasd".as_bytes()).unwrap();
+    let sign = rsa_sha256_prik_sign_pkcs8(&prik, "dadsdadasd".as_bytes()).unwrap();
     //公钥验签
     println!(
         "验签结果 : {:?}",
-        rsa_pubk_verify(&pubk, "dadsdadasd".as_bytes(), &sign)
+        rsa_sha256_pubk_verify_pkcs8(&pubk, "dadsdadasd".as_bytes(), &sign)
     );
     println!(
         "处理完毕 : {}",
