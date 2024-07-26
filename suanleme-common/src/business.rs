@@ -18,6 +18,9 @@ pub struct CommonResponse<T: Default> {
     data: Option<T>,
 }
 
+#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, Data)]
+pub struct Nil;
+
 impl<T: Default> Default for CommonRequest<T> {
     fn default() -> Self {
         Self {
