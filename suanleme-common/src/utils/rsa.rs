@@ -3,7 +3,7 @@ use rand::rngs::OsRng;
 use rsa::{
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
     pkcs8::{DecodePrivateKey, DecodePublicKey},
-    Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey,
+    BigUint, Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey,
 };
 use serde_json::Value;
 use sha2::Digest;
@@ -92,6 +92,14 @@ pub fn build_check_str(value: &Value, sign_str: &mut String) {
         sign_str.push_str(&value.to_string());
         sign_str.push(':');
     }
+}
+
+pub fn build_rsa_pubk_to_base64(modulus: &[u8], exponent: &[u8]) -> Result<String, BoxError> {
+    let public_key = RsaPublicKey::new(
+        BigUint::from_bytes_be(modulus),
+        BigUint::from_bytes_be(exponent),
+    )?;
+    Ok(BASE64_STANDARD.encode(public_key.to_pkcs1_der()?.as_bytes()))
 }
 
 #[test]
