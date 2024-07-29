@@ -18,7 +18,7 @@ impl Drop for Lock {
         let mut connect = self.connect.clone();
         tokio::spawn(async move {
             info!("Release Lock : {}", key);
-            let result: Result<String, RedisError> = connect.del::<&str, String>(&key).await;
+            let result: Result<i64, RedisError> = connect.del::<&str, i64>(&key).await;
             info!("Release Lock Result: {} - {:?}", key, result);
         });
     }
