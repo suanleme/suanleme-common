@@ -76,6 +76,19 @@ pub fn rsa_sha256_pubk_verify_pkcs8(
         .map_err(|e| e.into())
 }
 
+//rsa 公钥验签
+pub fn rsa_sha256_pubk_verify_pkcs1(
+    pubk: &str,
+    target: &[u8],
+    sign: &[u8],
+) -> Result<(), BoxError> {
+    let pubk = RsaPublicKey::from_pkcs1_der(&BASE64_STANDARD.decode(pubk)?)?;
+    let binding = sha2::Sha256::digest(target);
+    let target = binding.as_slice();
+    pubk.verify(Pkcs1v15Sign::new::<sha2::Sha256>(), target, sign)
+        .map_err(|e| e.into())
+}
+
 pub fn build_check_str(value: &Value, sign_str: &mut String) {
     if value.is_null() {
         return;
