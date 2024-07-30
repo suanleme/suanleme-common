@@ -37,14 +37,7 @@ uuid = { version = "1.10.0", features = ["v4"] }
 chrono = "0.4.38"
 
 #redis
-redis = { version = "0.25.4", features = ["tokio-comp"] }
-
-#数据库
-sqlx = { version = "0.8.0", features = [
-    "runtime-tokio-rustls",
-    "postgres",
-    "chrono",
-] }
+redis = { version = "0.26.0", features = ["tokio-comp"] }
 
 #加解密
 rsa = "0.9.6"

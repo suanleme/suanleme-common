@@ -86,7 +86,7 @@ impl RedisClient {
         &mut self,
         key: &str,
         value: &str,
-        seconds: usize,
+        seconds: u64,
     ) -> Result<String, BoxError> {
         let options = redis::SetOptions::default()
             .conditional_set(redis::ExistenceCheck::NX)
@@ -97,7 +97,7 @@ impl RedisClient {
             .map_err(|e| e.into())
     }
 
-    pub async fn get_lock(&mut self, key: &str, seconds: usize) -> Result<Lock, BoxError> {
+    pub async fn get_lock(&mut self, key: &str, seconds: u64) -> Result<Lock, BoxError> {
         let result = self.set_nx_ex(key, "lock", seconds).await?;
         if !result.to_uppercase().contains("OK") {
             info!("get lock error");
