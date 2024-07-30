@@ -9,7 +9,6 @@ pub mod shutdown;
 pub mod support;
 pub mod utils;
 pub use nacos_sdk;
-pub use sqlx;
 pub use suanleme_macro;
 pub use tracing;
 pub use base64;
