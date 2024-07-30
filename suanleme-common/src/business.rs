@@ -4,7 +4,7 @@ use crate::utils::date_util::get_now_date_time_as_millis;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Data)]
 pub struct CommonRequest<T: Default> {
-    user_id: Option<String>,
+    user_id: Option<i64>,
     token: Option<String>,
     sign_str: Option<String>,
     timestamp: u128,
