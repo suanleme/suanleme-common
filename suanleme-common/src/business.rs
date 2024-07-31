@@ -19,6 +19,17 @@ pub struct CommonResponse<T> {
     data: Option<T>,
 }
 
+impl<T> CommonResponse<T> {
+    pub fn into_data(self) -> Option<T> {
+        let CommonResponse {
+            code: _,
+            message: _,
+            data,
+        } = self;
+        data
+    }
+}
+
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, Data)]
 pub struct Nil;
 
