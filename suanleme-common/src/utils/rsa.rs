@@ -27,36 +27,45 @@ pub fn build_rsa_pair() -> (String, String) {
     )
 }
 
+pub fn get_rsa_pubk_pkcs1_der(pubk: &str) -> Result<RsaPublicKey, BoxError> {
+    RsaPublicKey::from_pkcs1_der(&BASE64_STANDARD.decode(pubk)?).map_err(|e| e.into())
+}
+pub fn get_rsa_pubk_pkcs1_pem_file(pubk_path: &str) -> Result<RsaPublicKey, BoxError> {
+    RsaPublicKey::read_pkcs1_pem_file(pubk_path).map_err(|e| e.into())
+}
+pub fn get_rsa_pubk_pkcs8_der(pubk: &str) -> Result<RsaPublicKey, BoxError> {
+    RsaPublicKey::from_public_key_der(&BASE64_STANDARD.decode(pubk)?).map_err(|e| e.into())
+}
+pub fn get_rsa_pubk_pkcs8_pem_file(pubk_path: &str) -> Result<RsaPublicKey, BoxError> {
+    RsaPublicKey::read_public_key_pem_file(pubk_path).map_err(|e| e.into())
+}
+
+pub fn get_rsa_prik_pkcs1_der(pubk: &str) -> Result<RsaPrivateKey, BoxError> {
+    RsaPrivateKey::from_pkcs1_der(&BASE64_STANDARD.decode(pubk)?).map_err(|e| e.into())
+}
+pub fn get_rsa_prik_pkcs1_pem_file(pubk_path: &str) -> Result<RsaPrivateKey, BoxError> {
+    RsaPrivateKey::read_pkcs1_pem_file(pubk_path).map_err(|e| e.into())
+}
+pub fn get_rsa_prik_pkcs8_der(pubk: &str) -> Result<RsaPrivateKey, BoxError> {
+    RsaPrivateKey::from_pkcs8_der(&BASE64_STANDARD.decode(pubk)?).map_err(|e| e.into())
+}
+pub fn get_rsa_prik_pkcs8_pem_file(pubk_path: &str) -> Result<RsaPrivateKey, BoxError> {
+    RsaPrivateKey::read_pkcs8_pem_file(pubk_path).map_err(|e| e.into())
+}
+
 //rsa 公钥加密
-pub fn rsa_pubk_encrypt(pubk: &str, target: &[u8]) -> Result<Vec<u8>, BoxError> {
-    let pubk = RsaPublicKey::from_pkcs1_der(&BASE64_STANDARD.decode(pubk)?)?;
+pub fn rsa_pubk_encrypt(pubk: &RsaPublicKey, target: &[u8]) -> Result<Vec<u8>, BoxError> {
     pubk.encrypt(&mut OsRng, Pkcs1v15Encrypt, target)
         .map_err(|e| e.into())
 }
 
 //rsa 私钥解密
-pub fn rsa_prik_decrypt(prik: &str, target: &[u8]) -> Result<Vec<u8>, BoxError> {
-    let prik = RsaPrivateKey::from_pkcs1_der(&BASE64_STANDARD.decode(prik)?)?;
+pub fn rsa_prik_decrypt(prik: &RsaPrivateKey, target: &[u8]) -> Result<Vec<u8>, BoxError> {
     prik.decrypt(Pkcs1v15Encrypt, target).map_err(|e| e.into())
 }
 
 //rsa 私钥加签
-pub fn rsa_prik_sign(prik: &str, target: &[u8]) -> Result<Vec<u8>, BoxError> {
-    let prik = RsaPrivateKey::from_pkcs1_der(&BASE64_STANDARD.decode(prik)?)?;
-    prik.sign(Pkcs1v15Sign::new_unprefixed(), target)
-        .map_err(|e| e.into())
-}
-
-//rsa 公钥验签
-pub fn rsa_pubk_verify(pubk: &str, target: &[u8], sign: &[u8]) -> Result<(), BoxError> {
-    let pubk = RsaPublicKey::from_pkcs1_der(&BASE64_STANDARD.decode(pubk)?)?;
-    pubk.verify(Pkcs1v15Sign::new_unprefixed(), target, sign)
-        .map_err(|e| e.into())
-}
-
-//rsa 私钥加签
-pub fn rsa_sha256_prik_sign_pkcs8(prik: &str, target: &[u8]) -> Result<Vec<u8>, BoxError> {
-    let prik = RsaPrivateKey::from_pkcs8_der(&BASE64_STANDARD.decode(prik)?)?;
+pub fn rsa_sha256_prik_sign(prik: &RsaPrivateKey, target: &[u8]) -> Result<Vec<u8>, BoxError> {
     let binding = sha2::Sha256::digest(target);
     let target = binding.as_slice();
     prik.sign(Pkcs1v15Sign::new::<sha2::Sha256>(), target)
@@ -64,25 +73,11 @@ pub fn rsa_sha256_prik_sign_pkcs8(prik: &str, target: &[u8]) -> Result<Vec<u8>, 
 }
 
 //rsa 公钥验签
-pub fn rsa_sha256_pubk_verify_pkcs8(
-    pubk: &str,
+pub fn rsa_sha256_pubk_verify(
+    pubk: &RsaPublicKey,
     target: &[u8],
     sign: &[u8],
 ) -> Result<(), BoxError> {
-    let pubk = RsaPublicKey::from_public_key_der(&BASE64_STANDARD.decode(pubk)?)?;
-    let binding = sha2::Sha256::digest(target);
-    let target = binding.as_slice();
-    pubk.verify(Pkcs1v15Sign::new::<sha2::Sha256>(), target, sign)
-        .map_err(|e| e.into())
-}
-
-//rsa 公钥验签
-pub fn rsa_sha256_pubk_verify_pkcs1(
-    pubk: &str,
-    target: &[u8],
-    sign: &[u8],
-) -> Result<(), BoxError> {
-    let pubk = RsaPublicKey::from_pkcs1_der(&BASE64_STANDARD.decode(pubk)?)?;
     let binding = sha2::Sha256::digest(target);
     let target = binding.as_slice();
     pubk.verify(Pkcs1v15Sign::new::<sha2::Sha256>(), target, sign)
@@ -121,6 +116,8 @@ fn test() {
     let (prik, pubk) = build_rsa_pair();
     println!("prik : {}", prik);
     println!("pubk : {}", pubk);
+    let pubk = get_rsa_pubk_pkcs1_der(&pubk).unwrap();
+    let prik = get_rsa_prik_pkcs1_der(&prik).unwrap();
     //公钥加密
     let en = rsa_pubk_encrypt(&pubk, "大会速度哈U盾花洒电弧电话手打".as_bytes()).unwrap();
     println!("加密后数据 : {:?}", String::from_utf8(en.clone()));
@@ -128,11 +125,11 @@ fn test() {
     let de = rsa_prik_decrypt(&prik, &en).unwrap();
     println!("解密后数据 : {:?}", String::from_utf8(de));
     //私钥加签
-    let sign = rsa_sha256_prik_sign_pkcs8(&prik, "dadsdadasd".as_bytes()).unwrap();
+    let sign = rsa_sha256_prik_sign(&prik, "dadsdadasd".as_bytes()).unwrap();
     //公钥验签
     println!(
         "验签结果 : {:?}",
-        rsa_sha256_pubk_verify_pkcs8(&pubk, "dadsdadasd".as_bytes(), &sign)
+        rsa_sha256_pubk_verify(&pubk, "dadsdadasd".as_bytes(), &sign)
     );
     println!(
         "处理完毕 : {}",
