@@ -43,8 +43,9 @@ pub struct PoolConfig {
 async fn test() {
     suanleme_common::log::init_log(
         &LogConfig::default()
-            .level("info")
-            .path("/Users/kwsc98/Desktop/workspace/gitlab/suanleme-common/log"),
+            .level("info".to_owned())
+            .path("/Users/kwsc98/Desktop/workspace/gitlab/suanleme-common/log".to_owned())
+            .devmode(Some(true)),
         "suanleme-common",
     );
     let nacos_config = suanleme_common::nacos::NacosConfig::builder()
