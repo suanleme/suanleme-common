@@ -41,11 +41,11 @@ pub struct PoolConfig {
 
 #[tokio::test]
 async fn test() {
-    suanleme_common::log::init_log(
+    let _logwork = suanleme_common::log::init_log(
         &LogConfig::default()
-            .level("info".to_owned())
+            .level("debug".to_owned())
             .path("/Users/kwsc98/Desktop/workspace/gitlab/suanleme-common/log".to_owned())
-            .devmode(Some(true)),
+            .devmode(Some(false)),
         "suanleme-common",
     );
     let nacos_config = suanleme_common::nacos::NacosConfig::builder()
