@@ -48,10 +48,9 @@ async fn test() {
             .devmode(Some(false)),
         "suanleme-common",
     );
-    let nacos_config = suanleme_common::nacos::NacosConfig::builder()
+    let nacos_config = suanleme_common::nacos::NacosConfig::default()
         .server_addr("127.0.0.1:8848".to_owned())
-        .app_name(Some("fusen-service".to_owned()))
-        .build();
+        .app_name(Some("fusen-service".to_owned()));
     let nacos_config = suanleme_common::nacos::NacosConfiguration::init_nacos_configuration(
         Arc::new(nacos_config),
     )

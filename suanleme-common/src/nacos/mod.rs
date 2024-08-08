@@ -5,7 +5,8 @@ use nacos_sdk::api::{
     error::Error,
     props::ClientProps,
 };
-use suanleme_macro::builder;
+use serde::{Deserialize, Serialize};
+use suanleme_macro::Data;
 use tokio::sync::mpsc;
 use tracing::{error, info};
 
@@ -14,7 +15,7 @@ use crate::{
     error::BoxError,
 };
 
-#[builder]
+#[derive(Serialize, Deserialize, Debug, Clone, Data, Default)]
 pub struct NacosConfig {
     pub server_addr: String,
     pub namespace: Option<String>,
@@ -72,7 +73,7 @@ impl NacosConfiguration {
         })
     }
 
-    pub async fn get_config< T: serde::de::DeserializeOwned>(
+    pub async fn get_config<T: serde::de::DeserializeOwned>(
         &self,
         config: &str,
     ) -> Result<T, BoxError> {
@@ -86,7 +87,7 @@ impl NacosConfiguration {
         NacosConfiguration::config_build(config_response)
     }
 
-    pub async fn get_receive_config< T: serde::de::DeserializeOwned + Send + 'static>(
+    pub async fn get_receive_config<T: serde::de::DeserializeOwned + Send + 'static>(
         &self,
         config: &str,
     ) -> Result<mpsc::Receiver<T>, BoxError> {
@@ -117,7 +118,7 @@ impl NacosConfiguration {
         Ok(receiver)
     }
 
-    pub fn config_build< T: serde::de::DeserializeOwned>(
+    pub fn config_build<T: serde::de::DeserializeOwned>(
         config_response: ConfigResponse,
     ) -> Result<T, BoxError> {
         match config_response.content_type().as_str() {
@@ -127,7 +128,7 @@ impl NacosConfiguration {
         }
     }
 
-    pub async fn get_hot_config< T: serde::de::DeserializeOwned + HotConfig>(
+    pub async fn get_hot_config<T: serde::de::DeserializeOwned + HotConfig>(
         &self,
         config: &str,
     ) -> Result<T, BoxError> {
