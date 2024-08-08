@@ -13,13 +13,13 @@ pub struct CommonRequest<T> {
 }
 
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, Data)]
-pub struct CommonResponse<T: serde::Serialize> {
+pub struct CommonResponse<T> {
     code: String,
     message: Option<String>,
     data: Option<T>,
 }
 
-impl<T: serde::Serialize> CommonResponse<T> {
+impl<T> CommonResponse<T> {
     pub fn into_data(self) -> Option<T> {
         let CommonResponse {
             code: _,
