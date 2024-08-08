@@ -1512,7 +1512,7 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "suanleme-common"
-version = "0.0.39"
+version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -1540,7 +1540,7 @@ dependencies = [
 
 [[package]]
 name = "suanleme-macro"
-version = "0.0.39"
+version = "0.1.0"
 dependencies = [
  "proc-macro2",
  "quote",
