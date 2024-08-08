@@ -93,12 +93,18 @@ pub fn build_check_str(value: &Value, sign_str: &mut String) {
         list.sort_by(|e1, e2| e1.0.cmp(e2.0));
         list.into_iter().filter(|e| !e.1.is_null()).for_each(|e| {
             sign_str.push_str(e.0);
-            sign_str.push(':');
+            sign_str.push('=');
             build_check_str(e.1, sign_str)
         });
     } else {
-        sign_str.push_str(&value.to_string());
-        sign_str.push(':');
+        let value_str = value.to_string();
+        let value_str = if value_str.starts_with('"') {
+            &value_str[1..value_str.len() - 1]
+        } else {
+            value_str.as_str()
+        };
+        sign_str.push_str(value_str);
+        sign_str.push('&');
     }
 }
 
@@ -112,6 +118,12 @@ pub fn build_rsa_pubk_to_base64(modulus: &[u8], exponent: &[u8]) -> Result<Strin
 
 #[test]
 fn test() {
+    //生成待加签字符串
+    let json_str = "{\"user_id\":159,\"timestamp\":1722237507,\"data\":{\"order_title\":\"test transfer\",\"trade_id\":\"test12345w1\",\"trans_amount\":500,\"target_account\":{\"identity_type\":\"AliPayLogonId\",\"identity\":\"18698630396\",\"username\":\"王思诚\"},\"remark\":\"testremark\"}}";
+    let json_value: Value = serde_json::from_str(json_str).unwrap();
+    let mut sign_str = String::new();
+    build_check_str(&json_value, &mut sign_str);
+    println!("sign_str : {}", sign_str);
     let start_time = crate::utils::date_util::get_now_date_time_as_millis();
     let (prik, pubk) = build_rsa_pair();
     println!("prik : {}", prik);

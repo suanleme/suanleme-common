@@ -4,11 +4,11 @@ resolver = "2"
 
 [workspace.package]
 authors = ["kwsc98 <kwsc98@gmail.com>"]
-version = "0.0.36"
+version = "0.0.37"
 edition = "2021"
 license = "Apache-2.0"
 description = "suanleme common module"
 
 [workspace.dependencies]
-suanleme-macro = { path = "suanleme-macro", version = "0.0.36", registry = "suanleme" }
-suanleme-common = { path = "suanleme-common", version = "0.0.36", registry = "suanleme" }
+suanleme-macro = { path = "suanleme-macro", version = "0.0.37", registry = "suanleme" }
+suanleme-common = { path = "suanleme-common", version = "0.0.37", registry = "suanleme" }
