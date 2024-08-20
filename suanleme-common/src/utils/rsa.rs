@@ -96,6 +96,10 @@ pub fn build_check_str(value: &Value, sign_str: &mut String) {
             sign_str.push('=');
             build_check_str(e.1, sign_str)
         });
+    } else if let serde_json::Value::Array(array) = value {
+        for item in array {
+            build_check_str(item, sign_str);
+        }
     } else {
         let value_str = value.to_string();
         let value_str = if value_str.starts_with('"') {
@@ -121,7 +125,7 @@ fn test() {
     //生成待加签字符串
     let json_str = "{\"user_id\":159,\"timestamp\":1722237507,\"data\":{\"order_title\":\"test transfer\",\"trade_id\":\"test12345w1\",\"trans_amount\":500,\"target_account\":{\"identity_type\":\"AliPayLogonId\",\"identity\":\"18698630396\",\"username\":\"王思诚\"},\"remark\":\"testremark\"}}";
     let json_value: Value = serde_json::from_str(json_str).unwrap();
-    let mut sign_str = String::new();
+        let mut sign_str = String::new();
     build_check_str(&json_value, &mut sign_str);
     println!("sign_str : {}", sign_str);
     let start_time = crate::utils::date_util::get_now_date_time_as_millis();
