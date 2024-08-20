@@ -7,7 +7,6 @@ use rsa::{
 };
 use serde_json::Value;
 use sha2::Digest;
-
 use crate::error::BoxError;
 
 pub fn build() -> (RsaPrivateKey, RsaPublicKey) {
@@ -112,6 +111,16 @@ pub fn build_check_str(value: &Value, sign_str: &mut String) {
     }
 }
 
+pub fn build_check_str_v2(
+    path: &str,
+    version: &str,
+    timestamp: &str,
+    token: &str,
+    data: &str,
+) -> String {
+    format!("{}\n{}\n{}\n{}\n{}", path, version, timestamp, token, data)
+}
+
 pub fn build_rsa_pubk_to_base64(modulus: &[u8], exponent: &[u8]) -> Result<String, BoxError> {
     let public_key = RsaPublicKey::new(
         BigUint::from_bytes_be(modulus),
@@ -125,7 +134,7 @@ fn test() {
     //生成待加签字符串
     let json_str = "{\"user_id\":159,\"timestamp\":1722237507,\"data\":{\"order_title\":\"test transfer\",\"trade_id\":\"test12345w1\",\"trans_amount\":500,\"target_account\":{\"identity_type\":\"AliPayLogonId\",\"identity\":\"18698630396\",\"username\":\"王思诚\"},\"remark\":\"testremark\"}}";
     let json_value: Value = serde_json::from_str(json_str).unwrap();
-        let mut sign_str = String::new();
+    let mut sign_str = String::new();
     build_check_str(&json_value, &mut sign_str);
     println!("sign_str : {}", sign_str);
     let start_time = crate::utils::date_util::get_now_date_time_as_millis();
