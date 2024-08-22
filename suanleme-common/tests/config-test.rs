@@ -87,9 +87,10 @@ async fn test2() {
 
 #[derive(Default, Data, StrategyDebug)]
 pub struct MyTest<T> {
-    #[strategy(mask)]
+    #[strategy(limit = 5)]
     str1: String,
     str2: String,
+    #[strategy(limit = 20)]
     resd: T,
 }
 
