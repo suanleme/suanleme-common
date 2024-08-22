@@ -32,3 +32,22 @@ pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<WorkerGuard> {
 pub fn get_uuid() -> String {
     uuid::Uuid::new_v4().to_string()
 }
+
+pub fn mask_str(str: &str) -> String {
+    let len = str.len();
+    let split = len / 2;
+    let split2 = split / 2;
+    let mut res = String::new();
+    res.push_str(&str[..split2]);
+    res.push_str(&"*".repeat(split));
+    res.push_str(&str[split2 + split..]);
+    res
+}
+
+pub fn limit_str(str: &str, limit: usize) -> &str {
+    if str.len() > limit {
+        &str[..limit]
+    } else {
+        str
+    }
+}

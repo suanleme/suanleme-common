@@ -5,7 +5,7 @@ use suanleme_common::{
     log::LogConfig,
     redis::{init_redis_client, RedisConfig},
 };
-use suanleme_macro::hot_config;
+use suanleme_macro::{hot_config, Data, StrategyDebug};
 use tracing::info;
 
 #[hot_config]
@@ -83,4 +83,33 @@ async fn test2() {
     let _ = tokio::time::sleep(Duration::from_secs(10)).await;
     drop(lock);
     let _ = tokio::time::sleep(Duration::from_secs(1)).await;
+}
+
+#[derive(Default, Data, StrategyDebug)]
+pub struct MyTest<T> {
+    #[strategy(mask)]
+    str1: String,
+    str2: String,
+    resd: T,
+}
+
+#[derive(Default, Data, StrategyDebug)]
+pub struct MyPoi {
+    str3: String,
+    str4: String,
+}
+
+#[test]
+fn test3() {
+    println!(
+        "{:?}",
+        MyTest::default()
+            .str1("123121341431341435".to_owned())
+            .str2("str2".to_owned())
+            .resd(
+                MyPoi::default()
+                    .str3("str3".to_owned())
+                    .str4("str4".to_owned())
+            )
+    );
 }

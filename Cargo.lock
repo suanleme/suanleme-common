@@ -1512,7 +1512,7 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "suanleme-common"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "base64 0.22.1",
  "chrono",
@@ -1528,6 +1528,7 @@ dependencies = [
  "serde_json",
  "serde_yaml",
  "sha2",
+ "suanleme-derive-macro",
  "suanleme-macro",
  "tokio",
  "toml",
@@ -1539,11 +1540,21 @@ dependencies = [
 ]
 
 [[package]]
-name = "suanleme-macro"
-version = "0.1.5"
+name = "suanleme-derive-macro"
+version = "0.1.6"
 dependencies = [
  "proc-macro2",
  "quote",
+ "syn 2.0.71",
+]
+
+[[package]]
+name = "suanleme-macro"
+version = "0.1.6"
+dependencies = [
+ "proc-macro2",
+ "quote",
+ "suanleme-derive-macro",
  "syn 2.0.71",
 ]
 
