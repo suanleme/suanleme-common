@@ -38,8 +38,7 @@ impl Aspect for LogAspect {
             Some(trade_id) => trade_id.to_owned(),
             None => {
                 let trade_id = get_trade_id();
-                context
-                    .get_mut_meta_data()
+                context.get_mut_request().get_mut_headers()
                     .insert("trade_id".to_string(), trade_id.clone());
                 trade_id
             }
