@@ -38,19 +38,22 @@ impl Aspect for LogAspect {
             Some(trade_id) => trade_id.to_owned(),
             None => {
                 let trade_id = get_trade_id();
-                context.get_mut_request().get_mut_headers()
+                context
+                    .get_mut_request()
+                    .get_mut_headers()
                     .insert("trade_id".to_string(), trade_id.clone());
                 trade_id
             }
         };
+        let mut enter = None;
         if !span.metadata().is_some_and(|e| e.name() == "trade_span") {
             span = self.get_span(
                 trade_id.clone(),
                 &context.get_context_info().get_path().get_key(),
             );
+            let _ = enter.insert(span.enter());
         }
         let start_time = get_now_date_time_as_millis();
-        let _enter = span.enter();
         info!(message = "start handler");
         let result = tokio::spawn(async move { filter.call(context).await }).await;
         let context = match result {
@@ -73,6 +76,7 @@ impl Aspect for LogAspect {
             message = "end handler",
             elapsed = get_now_date_time_as_millis() - start_time,
         );
+        drop(enter);
         context
     }
 }
