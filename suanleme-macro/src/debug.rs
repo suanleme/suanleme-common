@@ -61,11 +61,11 @@ pub fn debug(item: TokenStream) -> TokenStream {
             let limit = limit.parse::<usize>().unwrap();
             if field.ty.to_token_stream().to_string().as_str() == "String" {
                 fields.push(
-                    quote! {.field(#ident_name, &&format!("{}..",suanleme_common::log::limit_str(&self.#ident,#limit)))},
+                    quote! {.field(#ident_name, &&suanleme_common::log::limit_str(&self.#ident,#limit))},
                 );
             } else {
                 fields.push(
-                    quote! {.field(#ident_name, &&format!("{}..",suanleme_common::log::limit_str(&format!("{:?}",&self.#ident),#limit)))},
+                    quote! {.field(#ident_name, &&suanleme_common::log::limit_str(&format!("{:?}",&self.#ident),#limit))},
                 );
             }
         } else {

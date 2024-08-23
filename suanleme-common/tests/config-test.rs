@@ -105,7 +105,7 @@ fn test3() {
     println!(
         "{:?}",
         MyTest::default()
-            .str1("123121341431341435".to_owned())
+            .str1("12".to_owned())
             .str2("str2".to_owned())
             .resd(
                 MyPoi::default()

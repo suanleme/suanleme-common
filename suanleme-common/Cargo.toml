@@ -9,10 +9,11 @@ description.workspace = true
 [dependencies]
 suanleme-macro.workspace = true
 suanleme-derive-macro.workspace = true
-
+fusen-rs = "0.6.5"
 
 #网络协议处理
 tokio = { version = "1.38.1", features = ["full"] }
+bytes = "1.7.1"
 
 #json序列化
 serde = { version = "1.0.204", features = ["derive"] }

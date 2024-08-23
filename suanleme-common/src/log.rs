@@ -1,3 +1,4 @@
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use suanleme_macro::Data;
@@ -33,6 +34,14 @@ pub fn get_uuid() -> String {
     uuid::Uuid::new_v4().to_string()
 }
 
+pub fn get_trade_id() -> String {
+    format!(
+        "{}-{}",
+        uuid::Uuid::new_v4(),
+        Local::now().format("%Y%m%d%H%M%S")
+    )
+}
+
 pub fn mask_str(str: &str) -> String {
     let len = str.len();
     let split = len / 2;
@@ -44,10 +53,10 @@ pub fn mask_str(str: &str) -> String {
     res
 }
 
-pub fn limit_str(str: &str, limit: usize) -> &str {
+pub fn limit_str(str: &str, limit: usize) -> String {
     if str.len() > limit {
-        &str[..limit]
+        format!("{}..", &str[..limit])
     } else {
-        str
+        str.to_owned()
     }
 }
