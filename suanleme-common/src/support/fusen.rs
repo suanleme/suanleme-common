@@ -6,7 +6,7 @@ use fusen_rs::{
     handler::aspect::Aspect,
 };
 use suanleme_macro::Data;
-use tracing::{debug_span, error, error_span, info, info_span, warn_span, Span};
+use tracing::{debug_span, error, error_span, info, info_span, warn_span, Instrument, Span};
 
 #[allow(dead_code)]
 #[derive(Default, Data)]
@@ -55,7 +55,8 @@ impl Aspect for LogAspect {
         }
         let start_time = get_now_date_time_as_millis();
         info!(message = "start handler");
-        let result = tokio::spawn(async move { filter.call(context).await }).await;
+        let result =
+            tokio::spawn(async move { filter.call(context).await }.instrument(span.clone())).await;
         let context = match result {
             Ok(context) => context,
             Err(error) => {
