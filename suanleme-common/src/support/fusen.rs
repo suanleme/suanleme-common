@@ -5,14 +5,18 @@ use fusen_rs::{
     fusen_procedural_macro::handler,
     handler::aspect::Aspect,
 };
+use suanleme_macro::Data;
 use tracing::{debug_span, error, error_span, info, info_span, warn_span, Span};
 
 #[allow(dead_code)]
-pub struct LogAspect(String);
+#[derive(Default, Data)]
+pub struct LogAspect {
+    level: String,
+}
 
 impl LogAspect {
     fn get_span(&self, trade_id: String, path: &str) -> Span {
-        match self.0.as_str() {
+        match self.get_level().as_str() {
             "info" => info_span!("trade_span", trade_id = trade_id, path = path),
             "debug" => debug_span!("trade_span", trade_id = trade_id, path = path),
             "warn" => warn_span!("trade_span", trade_id = trade_id, path = path),
