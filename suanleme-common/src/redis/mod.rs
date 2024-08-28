@@ -1,9 +1,9 @@
-use log::info;
 use redis::{aio::MultiplexedConnection, AsyncCommands, RedisError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
 use suanleme_macro::Data;
+use tracing::debug;
 
 use crate::error::BoxError;
 
@@ -17,9 +17,9 @@ impl Drop for Lock {
         let key = self.key.clone();
         let mut connect = self.connect.clone();
         tokio::spawn(async move {
-            info!("Release Lock : {}", key);
+            debug!("Release Lock : {}", key);
             let result: Result<i64, RedisError> = connect.del::<&str, i64>(&key).await;
-            info!("Release Lock Result: {} - {:?}", key, result);
+            debug!("Release Lock Result: {} - {:?}", key, result);
         });
     }
 }
@@ -100,7 +100,7 @@ impl RedisClient {
     pub async fn get_lock(&mut self, key: &str, seconds: u64) -> Result<Lock, BoxError> {
         let result = self.set_nx_ex(key, "lock", seconds).await?;
         if !result.to_uppercase().contains("OK") {
-            info!("get lock error");
+            debug!("get lock error");
             return Err("redis response is not ok".into());
         };
         Ok(Lock {

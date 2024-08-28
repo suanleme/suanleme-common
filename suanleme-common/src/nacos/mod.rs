@@ -8,7 +8,7 @@ use nacos_sdk::api::{
 use serde::{Deserialize, Serialize};
 use suanleme_macro::Data;
 use tokio::sync::mpsc;
-use tracing::{error, info};
+use tracing::{debug, error};
 
 use crate::{
     config::{toml::get_toml_by_context, yaml::get_yaml_by_context, HotConfig},
@@ -164,7 +164,7 @@ impl ConfigChangeListener for HotConfigChangeListener {
     fn notify(&self, config_resp: nacos_sdk::api::config::ConfigResponse) {
         let sender = self.sender.clone();
         tokio::spawn(async move {
-            info!("Listener ConfigResponse Change : {}", config_resp);
+            debug!("Listener ConfigResponse Change : {}", config_resp);
             if let Err(error) = sender.send(config_resp).await {
                 error!("listener error : {}", error);
             }
