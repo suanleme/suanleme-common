@@ -1,4 +1,7 @@
-use crate::{log::get_trade_id, utils::date_util::get_now_date_time_as_millis};
+use crate::{
+    log::get_trace_id,
+    utils::{async_map::AsyncMap, date_util::get_now_date_time_as_millis},
+};
 use bytes::Bytes;
 use fusen_rs::{
     fusen_common::{self, FusenContext, FusenRequest},
@@ -12,16 +15,26 @@ use tracing::{debug_span, error, error_span, info, info_span, warn_span, Instrum
 #[derive(Default, Data)]
 pub struct LogAspect {
     level: String,
+    async_map: AsyncMap<u64, String>,
 }
 
 impl LogAspect {
-    fn get_span(&self, trade_id: String, path: &str) -> Span {
+    pub fn new(level: &str) -> Self {
+        Self {
+            level: level.to_owned(),
+            async_map: AsyncMap::new(),
+        }
+    }
+}
+
+impl LogAspect {
+    fn get_span(&self, trace_id: String, path: &str) -> Span {
         match self.get_level().as_str() {
-            "info" => info_span!("trade_span", trade_id = trade_id, path = path),
-            "debug" => debug_span!("trade_span", trade_id = trade_id, path = path),
-            "warn" => warn_span!("trade_span", trade_id = trade_id, path = path),
-            "error" => error_span!("trade_span", trade_id = trade_id, path = path),
-            _ => tracing::trace_span!("trade_span", trade_id = trade_id, path = path),
+            "info" => info_span!("trace_span", trace_id = trace_id, path = path),
+            "debug" => debug_span!("trace_span", trace_id = trace_id, path = path),
+            "warn" => warn_span!("trace_span", trace_id = trace_id, path = path),
+            "error" => error_span!("trace_span", trace_id = trace_id, path = path),
+            _ => tracing::trace_span!("trace_span", trace_id = trace_id, path = path),
         }
     }
 }
@@ -33,30 +46,46 @@ impl Aspect for LogAspect {
         filter: &'static dyn fusen_rs::filter::FusenFilter,
         mut context: fusen_common::FusenContext,
     ) -> Result<fusen_common::FusenContext, fusen_rs::Error> {
-        let mut span = tracing::Span::current();
-        let trade_id = match context.get_meta_data().get_value("trade_id") {
-            Some(trade_id) => trade_id.to_owned(),
+        let span = tracing::Span::current();
+        let trace_id = match context.get_meta_data().get_value("trace_id") {
+            Some(trace_id) => trace_id.to_owned(),
             None => {
-                let trade_id = get_trade_id();
+                let trace_id = if span.metadata().is_some_and(|e| e.name() == "trace_span") {
+                    self.async_map
+                        .get(span.id().unwrap().into_u64())
+                        .await?
+                        .map_or(get_trace_id(), |e| e)
+                } else {
+                    get_trace_id()
+                };
                 context
                     .get_mut_request()
                     .get_mut_headers()
-                    .insert("trade_id".to_string(), trade_id.clone());
-                trade_id
+                    .insert("trace_id".to_string(), trace_id.clone());
+                trace_id
             }
         };
-        let mut enter = None;
-        if !span.metadata().is_some_and(|e| e.name() == "trade_span") {
-            span = self.get_span(
-                trade_id.clone(),
-                &context.get_context_info().get_path().get_key(),
-            );
-            let _ = enter.insert(span.enter());
+        let mut new_span = None;
+        if span.is_none() {
+            let _ = new_span
+                .insert(self.get_span(trace_id, &context.get_context_info().get_path().get_key()));
         }
-        let start_time = get_now_date_time_as_millis();
-        info!(message = "start handler");
-        let result =
-            tokio::spawn(async move { filter.call(context).await }.instrument(span.clone())).await;
+
+        let future = async move {
+            let start_time = get_now_date_time_as_millis();
+            info!(message = "start handler");
+            let context = filter.call(context).await;
+            info!(
+                message = "end handler",
+                elapsed = get_now_date_time_as_millis() - start_time,
+            );
+            context
+        };
+        let result = if let Some(span) = new_span {
+            tokio::spawn(future.instrument(span)).await
+        } else {
+            tokio::spawn(future).await
+        };
         let context = match result {
             Ok(context) => context,
             Err(error) => {
@@ -73,11 +102,6 @@ impl Aspect for LogAspect {
                 Ok(context)
             }
         };
-        info!(
-            message = "end handler",
-            elapsed = get_now_date_time_as_millis() - start_time,
-        );
-        drop(enter);
         context
     }
 }

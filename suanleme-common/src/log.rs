@@ -92,7 +92,7 @@ pub fn get_uuid() -> String {
     uuid::Uuid::new_v4().to_string()
 }
 
-pub fn get_trade_id() -> String {
+pub fn get_trace_id() -> String {
     format!(
         "{}-{}",
         uuid::Uuid::new_v4(),
