@@ -81,11 +81,7 @@ impl Aspect for LogAspect {
             );
             context
         };
-        let result = if let Some(span) = new_span {
-            tokio::spawn(future.instrument(span)).await
-        } else {
-            tokio::spawn(future).await
-        };
+        let result = tokio::spawn(future.instrument(span)).await;
         let context = match result {
             Ok(context) => context,
             Err(error) => {
