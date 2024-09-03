@@ -97,6 +97,10 @@ impl RedisClient {
             .map_err(|e| e.into())
     }
 
+    pub async fn delete(&mut self, key: &str) -> Result<i64, BoxError> {
+        self.connect.del(key).await.map_err(|e| e.into())
+    }
+
     pub async fn get_lock(&mut self, key: &str, seconds: u64) -> Result<Lock, BoxError> {
         let result = self.set_nx_ex(key, "lock", seconds).await?;
         if !result.to_uppercase().contains("OK") {

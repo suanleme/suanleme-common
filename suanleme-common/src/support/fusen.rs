@@ -1,5 +1,5 @@
 use crate::{
-    log::get_trace_id,
+    suanleme_macro::Data,
     utils::{async_map::AsyncMap, date_util::get_now_date_time_as_millis},
 };
 use bytes::Bytes;
@@ -8,34 +8,43 @@ use fusen_rs::{
     fusen_procedural_macro::handler,
     handler::aspect::Aspect,
 };
-use suanleme_macro::Data;
+use opentelemetry::propagation::text_map_propagator::TextMapPropagator;
+use opentelemetry::{trace::TraceContextExt, Context};
+use opentelemetry_sdk::propagation::TraceContextPropagator;
 use tracing::{debug_span, error, error_span, info, info_span, warn_span, Instrument, Span};
+use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[allow(dead_code)]
 #[derive(Default, Data)]
 pub struct LogAspect {
+    name: String,
     level: String,
     async_map: AsyncMap<u64, String>,
+    trace_context_propagator: TraceContextPropagator,
 }
 
 impl LogAspect {
-    pub fn new(level: &str) -> Self {
+    pub fn new(name: &str, level: &str) -> Self {
         Self {
+            name: name.to_owned(),
             level: level.to_owned(),
             async_map: AsyncMap::new(),
+            trace_context_propagator: TraceContextPropagator::new(),
         }
     }
 }
 
 impl LogAspect {
-    fn get_span(&self, trace_id: String, path: &str) -> Span {
-        match self.get_level().as_str() {
-            "info" => info_span!("trace_span", trace_id = trace_id, path = path),
-            "debug" => debug_span!("trace_span", trace_id = trace_id, path = path),
-            "warn" => warn_span!("trace_span", trace_id = trace_id, path = path),
-            "error" => error_span!("trace_span", trace_id = trace_id, path = path),
-            _ => tracing::trace_span!("trace_span", trace_id = trace_id, path = path),
-        }
+    fn get_new_span(&self, context: Context, path: &str) -> Span {
+        let span = match self.get_level().as_str() {
+            "info" => info_span!("trace_span", path = path),
+            "debug" => debug_span!("trace_span", path = path),
+            "warn" => warn_span!("trace_span", path = path),
+            "error" => error_span!("trace_span", path = path),
+            _ => tracing::trace_span!("trace_span", path = path),
+        };
+        span.set_parent(context);
+        span
     }
 }
 
@@ -46,31 +55,20 @@ impl Aspect for LogAspect {
         filter: &'static dyn fusen_rs::filter::FusenFilter,
         mut context: fusen_common::FusenContext,
     ) -> Result<fusen_common::FusenContext, fusen_rs::Error> {
-        let span = tracing::Span::current();
-        let trace_id = match context.get_meta_data().get_value("trace_id") {
-            Some(trace_id) => trace_id.to_owned(),
-            None => {
-                let trace_id = if span.metadata().is_some_and(|e| e.name() == "trace_span") {
-                    self.async_map
-                        .get(span.id().unwrap().into_u64())
-                        .await?
-                        .map_or(get_trace_id(), |e| e)
-                } else {
-                    get_trace_id()
-                };
-                context
-                    .get_mut_request()
-                    .get_mut_headers()
-                    .insert("trace_id".to_string(), trace_id.clone());
-                trace_id
-            }
+        let span_context = self.get_trace_context_propagator().extract_with_context(
+            &Span::current().context(),
+            context.get_meta_data().get_inner(),
+        );
+        let span = self.get_new_span(
+            span_context,
+            &context.get_context_info().get_path().get_key(),
+        );
+        let trace_id = span.context().span().span_context().trace_id().to_string();
+        span.set_attribute("trace_id", trace_id.to_owned());
+        if context.get_meta_data().get_value("traceparent").is_none() {
+            self.get_trace_context_propagator()
+                .inject_context(&span.context(), context.get_mut_request().get_mut_headers());
         };
-        let mut new_span = None;
-        if span.is_none() {
-            let _ = new_span
-                .insert(self.get_span(trace_id, &context.get_context_info().get_path().get_key()));
-        }
-
         let future = async move {
             let start_time = get_now_date_time_as_millis();
             info!(message = "start handler");
