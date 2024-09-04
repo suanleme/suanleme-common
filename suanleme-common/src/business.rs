@@ -12,7 +12,7 @@ pub struct CommonRequest<T> {
     data: Option<T>,
 }
 
-#[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, Data)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Data)]
 pub struct CommonResponse<T> {
     code: String,
     message: Option<String>,
@@ -39,7 +39,7 @@ impl<T: serde::Serialize> From<CommonResponse<T>> for serde_json::Value {
 #[derive(Debug, Default, Clone, serde::Serialize, serde::Deserialize, Data)]
 pub struct Nil;
 
-impl<T: Default> Default for CommonRequest<T> {
+impl<T> Default for CommonRequest<T> {
     fn default() -> Self {
         Self {
             version: Default::default(),
@@ -47,7 +47,17 @@ impl<T: Default> Default for CommonRequest<T> {
             token: Default::default(),
             sign_str: Default::default(),
             timestamp: get_now_date_time_as_millis(),
-            data: Default::default(),
+            data: None,
+        }
+    }
+}
+
+impl<T> Default for CommonResponse<T> {
+    fn default() -> Self {
+        Self {
+            code: Default::default(),
+            message: Default::default(),
+            data: None,
         }
     }
 }

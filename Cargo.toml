@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 authors = ["kwsc98 <kwsc98@gmail.com>"]
-version = "0.1.15"
+version = "0.1.16"
 edition = "2021"
 license = "Apache-2.0"
 description = "suanleme common module"

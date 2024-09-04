@@ -82,7 +82,10 @@ pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<WorkerGuard> {
     } else {
         let tracing = tracing_subscriber::fmt::layer()
             .with_line_number(true)
-            .with_thread_ids(true);
+            .with_thread_ids(true)
+            .with_filter(tracing_subscriber::filter::LevelFilter::from_level(
+                Level::from_str(log_config.get_level()).unwrap(),
+            ));
         tracing_subscriber::registry().with(tracing).init();
         None
     }
