@@ -2021,7 +2021,7 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "suanleme-common"
-version = "0.1.18"
+version = "0.1.19"
 dependencies = [
  "base64",
  "bytes",
@@ -2058,7 +2058,7 @@ dependencies = [
 
 [[package]]
 name = "suanleme-derive-macro"
-version = "0.1.18"
+version = "0.1.19"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -2067,7 +2067,7 @@ dependencies = [
 
 [[package]]
 name = "suanleme-macro"
-version = "0.1.18"
+version = "0.1.19"
 dependencies = [
  "proc-macro2",
  "quote",

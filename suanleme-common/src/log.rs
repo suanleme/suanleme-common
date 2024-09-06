@@ -20,6 +20,7 @@ use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 #[derive(Clone, Data, Debug, Default, Serialize, Deserialize)]
 pub struct LogConfig {
+    pub level: String,
     pub path: Option<String>,
     pub endpoint: Option<String>,
     pub env_filter: Option<String>,
@@ -63,7 +64,8 @@ pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<LogWorkGroup> 
     let mut layter_list = vec![];
     let env_filter = || {
         if let Some(env_filter) = &log_config.env_filter {
-            EnvFilter::from_str(env_filter).unwrap()
+            let env_filter = env_filter.replace("{level}", log_config.get_level());
+            EnvFilter::from_str(&env_filter).unwrap()
         } else {
             EnvFilter::from_default_env()
         }
