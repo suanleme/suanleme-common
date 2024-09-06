@@ -4,7 +4,7 @@ resolver = "2"
 
 [workspace.package]
 authors = ["kwsc98 <kwsc98@gmail.com>"]
-version = "0.1.16"
+version = "0.1.17"
 edition = "2021"
 license = "Apache-2.0"
 description = "suanleme common module"
@@ -12,4 +12,4 @@ description = "suanleme common module"
 [workspace.dependencies]
 suanleme-derive-macro = { path = "suanleme-derive-macro", version = "0.1.15", registry = "suanleme" }
 suanleme-macro = { path = "suanleme-macro", version = "0.1.15", registry = "suanleme" }
-suanleme-common = { path = "suanleme-common", version = "0.1.15", registry = "suanleme" }
+suanleme-common = { path = "suanleme-common", version = "0.1.17", registry = "suanleme" }

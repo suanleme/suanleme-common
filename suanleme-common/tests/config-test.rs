@@ -26,13 +26,15 @@ pub struct SuanlemeDb {
 async fn test() {
     let _logwork = suanleme_common::log::init_log(
         &LogConfig::default()
-            .level("debug".to_owned())
-            .path("/Users/kwsc98/Desktop/workspace/gitlab/suanleme-common/log".to_owned())
+            .env_filter(Some("config_test=debug".to_owned()))
+            .path(Some(
+                "/Users/kwsc98/Desktop/workspace/gitlab/suanleme-common/log".to_owned(),
+            ))
             .endpoint(Some("http://127.0.0.1:4317".to_owned()))
-            .devmode(Some(false)),
+            .devmode(Some(true)),
         "suanleme-common4",
     );
-    let span = debug_span!("trace_span", id = "1221");
+    let span = debug_span!("trace_span", id = "1221").entered();
     let _enter = span.enter();
     let nacos_config = suanleme_common::nacos::NacosConfig::default()
         .server_addr("127.0.0.1:8848".to_owned())

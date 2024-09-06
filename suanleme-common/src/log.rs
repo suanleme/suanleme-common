@@ -8,25 +8,36 @@ use opentelemetry_sdk::{
     Resource,
 };
 use serde::{Deserialize, Serialize};
-use std::collections::HashSet;
 use std::str::FromStr;
 use suanleme_macro::Data;
-use tracing::Level;
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
 };
 use tracing_opentelemetry::OpenTelemetryLayer;
-use tracing_subscriber::filter::filter_fn;
+use tracing_subscriber::EnvFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
 #[derive(Clone, Data, Debug, Default, Serialize, Deserialize)]
 pub struct LogConfig {
-    pub level: String,
-    pub path: String,
+    pub path: Option<String>,
     pub endpoint: Option<String>,
-    pub span_filter: Option<HashSet<String>>,
+    pub env_filter: Option<String>,
     pub devmode: Option<bool>,
+}
+
+#[derive(Default, Data)]
+pub struct LogWorkGroup {
+    work_guard: Option<WorkerGuard>,
+    tracer_provider: Option<Tracer>,
+}
+
+impl Drop for LogWorkGroup {
+    fn drop(&mut self) {
+        if let Some(tracer_provider) = &self.tracer_provider {
+            let _ = tracer_provider.shutdown();
+        }
+    }
 }
 
 fn init_opentelemetry_trace(otlp_url: &str, app_name: &str) -> Result<Tracer, TraceError> {
@@ -46,49 +57,55 @@ fn init_opentelemetry_trace(otlp_url: &str, app_name: &str) -> Result<Tracer, Tr
         .install_batch(runtime::Tokio)
 }
 
-pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<WorkerGuard> {
-    if log_config.devmode.is_some_and(|e| !e) || log_config.devmode.is_none() {
+pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<LogWorkGroup> {
+    let mut worker_guard = None;
+    let mut tracer_guard = None;
+    let mut layter_list = vec![];
+    let env_filter = || {
+        if let Some(env_filter) = &log_config.env_filter {
+            EnvFilter::from_str(env_filter).unwrap()
+        } else {
+            EnvFilter::from_default_env()
+        }
+    };
+    if let Some(path) = &log_config.path {
+        let file_appender = RollingFileAppender::new(Rotation::DAILY, path, app_name);
+        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
+        let _ = worker_guard.insert(guard);
         let tracing = tracing_subscriber::fmt::layer()
             .with_line_number(true)
             .with_thread_ids(true);
-        let file_appender = RollingFileAppender::new(Rotation::DAILY, &log_config.path, app_name);
-        let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
         let json_tracing = tracing.json().with_writer(non_blocking);
-        let tracing_subscriber = tracing_subscriber::registry().with(json_tracing.with_filter(
-            tracing_subscriber::filter::LevelFilter::from_level(
-                Level::from_str(log_config.get_level()).unwrap(),
-            ),
-        ));
-        if let Some(otlp_url) = &log_config.endpoint {
-            let provider = init_opentelemetry_trace(otlp_url, app_name).unwrap();
-            let opentelemetry_layer = OpenTelemetryLayer::new(provider.tracer(app_name.to_owned()));
-            if log_config
-                .get_span_filter()
-                .as_ref()
-                .is_some_and(|e| !e.is_empty())
-            {
-                let set = log_config.get_span_filter().clone().unwrap();
-                let name_filter = filter_fn(move |metadata| set.contains(metadata.name()));
-                tracing_subscriber
-                    .with(opentelemetry_layer.with_filter(name_filter))
-                    .init();
-            } else {
-                tracing_subscriber.with(opentelemetry_layer).init();
-            }
-        } else {
-            tracing_subscriber.init();
-        }
-        Some(guard)
-    } else {
+        layter_list.push(json_tracing.boxed());
+    };
+    if log_config.devmode.is_some_and(|e| e) {
         let tracing = tracing_subscriber::fmt::layer()
             .with_line_number(true)
-            .with_thread_ids(true)
-            .with_filter(tracing_subscriber::filter::LevelFilter::from_level(
-                Level::from_str(log_config.get_level()).unwrap(),
-            ));
-        tracing_subscriber::registry().with(tracing).init();
-        None
+            .with_thread_ids(true);
+        layter_list.push(tracing.boxed());
     }
+    if let Some(endpoint) = &log_config.endpoint {
+        let provider = init_opentelemetry_trace(endpoint, app_name).unwrap();
+        let _ = tracer_guard.insert(provider.clone());
+        let opentelemetry = OpenTelemetryLayer::new(provider.tracer(app_name.to_owned()));
+        layter_list.push(opentelemetry.boxed());
+    }
+    if layter_list.is_empty() {
+        return None;
+    }
+    let mut layer = layter_list.remove(0);
+    for item in layter_list {
+        layer = Box::new(layer.and_then(item));
+    }
+    tracing_subscriber::registry()
+        .with(env_filter())
+        .with(layer)
+        .init();
+    Some(
+        LogWorkGroup::default()
+            .tracer_provider(tracer_guard)
+            .work_guard(worker_guard),
+    )
 }
 
 pub fn get_uuid() -> String {

@@ -1,7 +1,4 @@
-use crate::{
-    suanleme_macro::Data,
-    utils::{async_map::AsyncMap, date_util::get_now_date_time_as_millis},
-};
+use crate::{suanleme_macro::Data, utils::date_util::get_now_date_time_as_millis};
 use bytes::Bytes;
 use fusen_rs::{
     fusen_common::{self, FusenContext, FusenRequest},
@@ -15,33 +12,58 @@ use tracing::{debug_span, error, error_span, info, info_span, warn_span, Instrum
 use tracing_opentelemetry::OpenTelemetrySpanExt;
 
 #[allow(dead_code)]
-#[derive(Default, Data)]
+#[derive(Data)]
 pub struct LogAspect {
-    name: String,
     level: String,
-    async_map: AsyncMap<u64, String>,
     trace_context_propagator: TraceContextPropagator,
 }
 
 impl LogAspect {
-    pub fn new(name: &str, level: &str) -> Self {
+    pub fn new(level: &str) -> Self {
         Self {
-            name: name.to_owned(),
             level: level.to_owned(),
-            async_map: AsyncMap::new(),
             trace_context_propagator: TraceContextPropagator::new(),
         }
     }
 }
 
 impl LogAspect {
+    fn get_parent_span(&self, path: &str) -> Span {
+        match self.get_level().as_str() {
+            "info" => info_span!("begin_span", path = path),
+            "debug" => debug_span!("begin_span", path = path),
+            "warn" => warn_span!("begin_span", path = path),
+            "error" => error_span!("begin_span", path = path),
+            _ => tracing::trace_span!("begin_span", path = path),
+        }
+    }
     fn get_new_span(&self, context: Context, path: &str) -> Span {
         let span = match self.get_level().as_str() {
-            "info" => info_span!("trace_span", path = path),
-            "debug" => debug_span!("trace_span", path = path),
-            "warn" => warn_span!("trace_span", path = path),
-            "error" => error_span!("trace_span", path = path),
-            _ => tracing::trace_span!("trace_span", path = path),
+            "info" => info_span!(
+                "trace_span",
+                trace_id = context.span().span_context().trace_id().to_string(),
+                path = path
+            ),
+            "debug" => debug_span!(
+                "trace_span",
+                trace_id = context.span().span_context().trace_id().to_string(),
+                path = path
+            ),
+            "warn" => warn_span!(
+                "trace_span",
+                trace_id = context.span().span_context().trace_id().to_string(),
+                path = path
+            ),
+            "error" => error_span!(
+                "trace_span",
+                trace_id = context.span().span_context().trace_id().to_string(),
+                path = path
+            ),
+            _ => tracing::trace_span!(
+                "trace_span",
+                trace_id = context.span().span_context().trace_id().to_string(),
+                path = path
+            ),
         };
         span.set_parent(context);
         span
@@ -55,10 +77,16 @@ impl Aspect for LogAspect {
         filter: &'static dyn fusen_rs::filter::FusenFilter,
         mut context: fusen_common::FusenContext,
     ) -> Result<fusen_common::FusenContext, fusen_rs::Error> {
-        let span_context = self.get_trace_context_propagator().extract_with_context(
+        let mut span_context = self.get_trace_context_propagator().extract_with_context(
             &Span::current().context(),
             context.get_meta_data().get_inner(),
         );
+        let mut first_span = None;
+        if !span_context.has_active_span() {
+            let span = self.get_parent_span(&context.get_context_info().get_path().get_key());
+            span_context = span.context();
+            let _ = first_span.insert(span);
+        }
         let span = self.get_new_span(
             span_context,
             &context.get_context_info().get_path().get_key(),
