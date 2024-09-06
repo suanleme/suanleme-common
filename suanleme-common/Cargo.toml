@@ -9,7 +9,7 @@ description.workspace = true
 [dependencies]
 suanleme-macro.workspace = true
 suanleme-derive-macro.workspace = true
-fusen-rs = "0.6.6"
+fusen-rs = "0.6.8"
 
 #网络协议处理
 tokio = { version = "1.38.1", features = ["full"] }
