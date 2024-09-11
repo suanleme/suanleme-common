@@ -15,6 +15,8 @@ use tracing_appender::{
     rolling::{RollingFileAppender, Rotation},
 };
 use tracing_opentelemetry::OpenTelemetryLayer;
+use tracing_subscriber::fmt::format::Writer;
+use tracing_subscriber::fmt::time::FormatTime;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
@@ -71,19 +73,26 @@ pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<LogWorkGroup> 
         }
     };
     if let Some(path) = &log_config.path {
-        let file_appender = RollingFileAppender::new(Rotation::DAILY, path, app_name);
+        let file_appender = RollingFileAppender::builder()
+            .rotation(Rotation::DAILY)
+            .filename_prefix(app_name)
+            .filename_suffix("log")
+            .build(path)
+            .expect("initializing rolling file appender failed");
         let (non_blocking, guard) = tracing_appender::non_blocking(file_appender);
         let _ = worker_guard.insert(guard);
         let tracing = tracing_subscriber::fmt::layer()
             .with_line_number(true)
-            .with_thread_ids(true);
+            .with_thread_ids(true)
+            .with_timer(LocalTimer);
         let json_tracing = tracing.json().with_writer(non_blocking);
         layter_list.push(json_tracing.boxed());
     };
     if log_config.devmode.is_some_and(|e| e) {
         let tracing = tracing_subscriber::fmt::layer()
             .with_line_number(true)
-            .with_thread_ids(true);
+            .with_thread_ids(true)
+            .with_timer(LocalTimer);
         layter_list.push(tracing.boxed());
     }
     if let Some(endpoint) = &log_config.endpoint {
@@ -108,6 +117,14 @@ pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<LogWorkGroup> 
             .tracer_provider(tracer_guard)
             .work_guard(worker_guard),
     )
+}
+
+struct LocalTimer;
+
+impl FormatTime for LocalTimer {
+    fn format_time(&self, w: &mut Writer<'_>) -> std::fmt::Result {
+        write!(w, "{}", Local::now().format("%FT%T%.3f"))
+    }
 }
 
 pub fn get_uuid() -> String {
