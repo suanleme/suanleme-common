@@ -3,7 +3,7 @@ use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
 use suanleme_macro::Data;
-use tracing::debug;
+use tracing::{debug, instrument};
 
 use crate::error::BoxError;
 
@@ -45,12 +45,14 @@ pub async fn init_redis_client(config: &RedisConfig) -> Result<RedisClient, Redi
     })
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct RedisClient {
     connect: MultiplexedConnection,
 }
 
 impl RedisClient {
+
+    #[instrument]
     pub async fn get<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>, BoxError> {
         let value: Option<String> = self.get_str(key).await?;
         let Some(str) = value else {
@@ -62,10 +64,12 @@ impl RedisClient {
             .map_err(|e| e.to_string().into())
     }
 
+    #[instrument]
     pub async fn get_str(&mut self, key: &str) -> Result<Option<String>, BoxError> {
         self.connect.get(key).await.map_err(|e| e.into())
     }
-
+    
+    #[instrument]
     pub async fn set_ex(
         &mut self,
         key: &str,
@@ -82,6 +86,7 @@ impl RedisClient {
         }
     }
 
+    #[instrument]
     pub async fn set_nx_ex(
         &mut self,
         key: &str,
@@ -96,11 +101,13 @@ impl RedisClient {
             .await
             .map_err(|e| e.into())
     }
-
+    
+    #[instrument]
     pub async fn delete(&mut self, key: &str) -> Result<i64, BoxError> {
         self.connect.del(key).await.map_err(|e| e.into())
     }
 
+    #[instrument]
     pub async fn get_lock(&mut self, key: &str, seconds: u64) -> Result<Lock, BoxError> {
         let result = self.set_nx_ex(key, "lock", seconds).await?;
         if !result.to_uppercase().contains("OK") {
