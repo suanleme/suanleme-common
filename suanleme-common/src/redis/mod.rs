@@ -62,12 +62,12 @@ impl RedisClient {
             .map_err(|e| e.to_string().into())
     }
 
-    #[instrument(name = "redis get_str", fields(key))]
+    #[instrument(name = "redis get_str", skip(self))]
     pub async fn get_str(&mut self, key: &str) -> Result<Option<String>, BoxError> {
         self.connect.get(key).await.map_err(|e| e.into())
     }
 
-    #[instrument(name = "redis set_ex", fields(key, value, seconds))]
+    #[instrument(name = "redis set_ex", skip(self))]
     pub async fn set_ex(
         &mut self,
         key: &str,
@@ -84,7 +84,7 @@ impl RedisClient {
         }
     }
 
-    #[instrument(name = "redis set_nx_ex", fields(key, value, seconds))]
+    #[instrument(name = "redis set_nx_ex", skip(self))]
     pub async fn set_nx_ex(
         &mut self,
         key: &str,
@@ -100,12 +100,12 @@ impl RedisClient {
             .map_err(|e| e.into())
     }
 
-    #[instrument(name = "redis delete", fields(key))]
+    #[instrument(name = "redis delete", skip(self))]
     pub async fn delete(&mut self, key: &str) -> Result<i64, BoxError> {
         self.connect.del(key).await.map_err(|e| e.into())
     }
 
-    #[instrument(name = "redis get_lock", fields(key, seconds))]
+    #[instrument(name = "redis get_lock", skip(self))]
     pub async fn get_lock(&mut self, key: &str, seconds: u64) -> Result<Lock, BoxError> {
         let result = self.set_nx_ex(key, "lock", seconds).await?;
         if !result.to_uppercase().contains("OK") {
