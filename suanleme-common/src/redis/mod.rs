@@ -51,8 +51,6 @@ pub struct RedisClient {
 }
 
 impl RedisClient {
-
-    #[instrument]
     pub async fn get<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>, BoxError> {
         let value: Option<String> = self.get_str(key).await?;
         let Some(str) = value else {
@@ -64,12 +62,12 @@ impl RedisClient {
             .map_err(|e| e.to_string().into())
     }
 
-    #[instrument]
+    #[instrument(name = "redis get_str", fields(key))]
     pub async fn get_str(&mut self, key: &str) -> Result<Option<String>, BoxError> {
         self.connect.get(key).await.map_err(|e| e.into())
     }
-    
-    #[instrument]
+
+    #[instrument(name = "redis set_ex", fields(key, value, seconds))]
     pub async fn set_ex(
         &mut self,
         key: &str,
@@ -86,7 +84,7 @@ impl RedisClient {
         }
     }
 
-    #[instrument]
+    #[instrument(name = "redis set_nx_ex", fields(key, value, seconds))]
     pub async fn set_nx_ex(
         &mut self,
         key: &str,
@@ -101,13 +99,13 @@ impl RedisClient {
             .await
             .map_err(|e| e.into())
     }
-    
-    #[instrument]
+
+    #[instrument(name = "redis delete", fields(key))]
     pub async fn delete(&mut self, key: &str) -> Result<i64, BoxError> {
         self.connect.del(key).await.map_err(|e| e.into())
     }
 
-    #[instrument]
+    #[instrument(name = "redis get_lock", fields(key, seconds))]
     pub async fn get_lock(&mut self, key: &str, seconds: u64) -> Result<Lock, BoxError> {
         let result = self.set_nx_ex(key, "lock", seconds).await?;
         if !result.to_uppercase().contains("OK") {
