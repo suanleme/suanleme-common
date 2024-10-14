@@ -1,9 +1,7 @@
 use crate::{suanleme_macro::Data, utils::date_util::get_now_date_time_as_millis};
 use bytes::Bytes;
 use fusen_rs::{
-    fusen_common::{self, FusenContext, FusenRequest},
-    fusen_procedural_macro::handler,
-    handler::aspect::Aspect,
+    filter::ProceedingJoinPoint, fusen_common::{self, FusenContext, FusenRequest}, fusen_procedural_macro::handler, handler::aspect::Aspect
 };
 use opentelemetry::propagation::text_map_propagator::TextMapPropagator;
 use opentelemetry::{trace::TraceContextExt, Context};
@@ -74,9 +72,9 @@ impl LogAspect {
 impl Aspect for LogAspect {
     async fn aroud(
         &self,
-        filter: &'static dyn fusen_rs::filter::FusenFilter,
-        mut context: fusen_common::FusenContext,
+        mut join_point: ProceedingJoinPoint
     ) -> Result<fusen_common::FusenContext, fusen_rs::Error> {
+        let context = join_point.get_mut_context();
         let mut span_context = self.get_trace_context_propagator().extract_with_context(
             &Span::current().context(),
             context.get_meta_data().get_inner(),
@@ -100,7 +98,7 @@ impl Aspect for LogAspect {
         let future = async move {
             let start_time = get_now_date_time_as_millis();
             info!(message = "start handler");
-            let context = filter.call(context).await;
+            let context = join_point.proceed().await;
             info!(
                 message = "end handler",
                 elapsed = get_now_date_time_as_millis() - start_time,

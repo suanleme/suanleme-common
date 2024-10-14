@@ -9,7 +9,7 @@ description.workspace = true
 [dependencies]
 suanleme-macro.workspace = true
 suanleme-derive-macro.workspace = true
-fusen-rs = "0.6.8"
+fusen-rs = "0.6.9"
 
 #网络协议处理
 tokio = { version = "1.38.1", features = ["full"] }
@@ -34,10 +34,10 @@ tracing-subscriber = { version = "0.3.18", features = [
 ] }
 pretty_env_logger = "0.5.0"
 tracing-appender = "0.2.3"
-tracing-opentelemetry = "0.25.0"
-opentelemetry = "0.24.0"
-opentelemetry_sdk = { version = "0.24.1", features = ["rt-tokio"] }
-opentelemetry-otlp = "0.17.0"
+tracing-opentelemetry = "0.27.0"
+opentelemetry = "0.26.0"
+opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
+opentelemetry-otlp = "0.26.0"
 
 #其他
 lazy_static = "1.5.0"
@@ -48,7 +48,7 @@ uuid = { version = "1.10.0", features = ["v4"] }
 chrono = "0.4.38"
 
 #redis
-redis = { version = "0.26.0", features = ["tokio-comp"] }
+redis = { version = "0.27.0", features = ["tokio-comp"] }
 
 #加解密
 rsa = "0.9.6"
