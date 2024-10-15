@@ -1,4 +1,4 @@
-use redis::{aio::MultiplexedConnection, AsyncCommands, RedisError};
+use redis::{aio::{ConnectionManager, MultiplexedConnection}, AsyncCommands, RedisError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::str::FromStr;
@@ -45,10 +45,86 @@ pub async fn init_redis_client(config: &RedisConfig) -> Result<RedisClient, Redi
     })
 }
 
+pub async fn init_redis_clientV2(config: &RedisConfig) -> Result<RedisPoolClient, RedisError> {
+    let redis_url = if let Some(password) = &config.password {
+        format!("redis://:{}@{}/{}", password, config.host, config.db)
+    } else {
+        format!("redis://{}/{}", config.host, config.db)
+    };
+    Ok(RedisPoolClient {
+        connection_manager: redis::Client::open(redis_url)?
+        .get_connection_manager()
+        .await?,
+    })
+}
+
 #[derive(Clone, Debug)]
 pub struct RedisClient {
     connect: MultiplexedConnection,
 }
+
+#[derive(Clone)]
+pub struct RedisPoolClient {
+    connection_manager: ConnectionManager,
+}
+
+impl RedisPoolClient {
+    pub async fn get<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>, BoxError> {
+        let value: Option<String> = self.get_str(key).await?;
+        let Some(str) = value else {
+            return Ok(None);
+        };
+        let value = Value::from_str(&str)?;
+        T::deserialize(value)
+            .map(|e| Some(e))
+            .map_err(|e| e.to_string().into())
+    }
+
+    #[instrument(name = "redis get_str", skip(self))]
+    pub async fn get_str(&mut self, key: &str) -> Result<Option<String>, BoxError> {
+        self.connection_manager.get(key).await.map_err(|e| e.into())
+    }
+
+    #[instrument(name = "redis set_ex", skip(self))]
+    pub async fn set_ex(
+        &mut self,
+        key: &str,
+        value: &str,
+        seconds: i64,
+    ) -> Result<String, BoxError> {
+        if seconds < 0 {
+            self.connection_manager.set(key, value).await.map_err(|e| e.into())
+        } else {
+            self.connection_manager
+                .set_ex(key, value, seconds as u64)
+                .await
+                .map_err(|e| e.into())
+        }
+    }
+
+    #[instrument(name = "redis set_nx_ex", skip(self))]
+    pub async fn set_nx_ex(
+        &mut self,
+        key: &str,
+        value: &str,
+        seconds: u64,
+    ) -> Result<String, BoxError> {
+        let options = redis::SetOptions::default()
+            .conditional_set(redis::ExistenceCheck::NX)
+            .with_expiration(redis::SetExpiry::EX(seconds));
+        self.connection_manager
+            .set_options(key, value, options)
+            .await
+            .map_err(|e| e.into())
+    }
+
+    #[instrument(name = "redis delete", skip(self))]
+    pub async fn delete(&mut self, key: &str) -> Result<i64, BoxError> {
+        self.connection_manager.del(key).await.map_err(|e| e.into())
+    }
+
+}
+
 
 impl RedisClient {
     pub async fn get<T: DeserializeOwned>(&mut self, key: &str) -> Result<Option<T>, BoxError> {

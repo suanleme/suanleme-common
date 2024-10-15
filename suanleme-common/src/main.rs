@@ -1,6 +1,8 @@
+use fusen_rs::fusen_common::date_util::get_now_date_time_as_millis;
 use serde::{Deserialize, Serialize};
+use tokio::sync::mpsc;
 use std::{sync::Arc, time::Duration};
-use suanleme_common::{config::HotConfig, log::LogConfig};
+use suanleme_common::{config::HotConfig, log::LogConfig, redis::{init_redis_client, init_redis_clientV2, RedisConfig}, utils::token::get_token};
 use suanleme_macro::hot_config;
 use tracing::{debug, debug_span, info};
 
@@ -64,32 +66,40 @@ async fn test() {
     }
 }
 
-// #[tokio::test]
-// async fn test2() {
-//     let mut redis_client =
-//         init_redis_client(&RedisConfig::default().host("127.0.0.1:6379".to_owned()))
-//             .await
-//             .unwrap();
-//     let lock = redis_client.get_lock("key", 60).await.unwrap();
-//     let _ = tokio::time::sleep(Duration::from_secs(10)).await;
-//     drop(lock);
-//     let _ = tokio::time::sleep(Duration::from_secs(1)).await;
-// }
-
-// #[derive(Default, Data, StrategyDebug)]
-// pub struct MyTest<T> {
-//     #[strategy(limit = 5)]
-//     str1: String,
-//     str2: String,
-//     #[strategy(limit = 20)]
-//     resd: T,
-// }
-
-// #[derive(Default, Data, StrategyDebug)]
-// pub struct MyPoi {
-//     str3: String,
-//     str4: String,
-// }
+#[tokio::main(flavor = "multi_thread")]
+async fn main() {
+    let mut redis_client =
+        init_redis_client(&RedisConfig::default().host("redis.suanleme.local:6379".to_owned()).db(1).password(Some("123456".to_owned())))
+            .await
+            .unwrap();
+    let mut redis_clientv2 =
+        init_redis_clientV2(&RedisConfig::default().host("redis.suanleme.local:6379".to_owned()).db(1).password(Some("123456".to_owned())))
+            .await
+            .unwrap();
+    let start = get_now_date_time_as_millis();
+    let (s,mut t) = mpsc::channel::<i32>(1); 
+    for idx in 0..50 {
+        let mut client = redis_client.clone();
+        let s_clone = s.clone();
+        tokio::spawn(async move {
+            for item in 0..10000 {
+                let token = get_token();
+                let _ = client.set_ex(&format!("{}:{}",idx,item), &token, -1).await;
+                let token1 = client.get_str(&format!("{}:{}",idx,item)).await.unwrap().unwrap();
+                if token != token1 {
+                    println!("error");
+                }
+            }
+            println!("{}",idx);
+            drop(s_clone);
+        });
+    }
+    //22750
+    drop(s);
+    t.recv().await;
+    println!("end {}",get_now_date_time_as_millis() - start);
+    tokio::time::sleep(Duration::from_secs(1000000)).await;
+}
 
 // #[test]
 // fn test3() {
