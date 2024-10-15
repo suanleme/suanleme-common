@@ -1,3 +1,4 @@
+use crate::error::BoxError;
 use base64::{prelude::BASE64_STANDARD, Engine};
 use rand::rngs::OsRng;
 use rsa::{
@@ -7,7 +8,6 @@ use rsa::{
 };
 use serde_json::Value;
 use sha2::Digest;
-use crate::error::BoxError;
 
 pub fn build() -> (RsaPrivateKey, RsaPublicKey) {
     // 生成RSA密钥对

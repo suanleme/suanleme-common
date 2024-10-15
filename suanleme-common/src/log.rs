@@ -157,3 +157,8 @@ pub fn limit_str(str: &str, limit: usize) -> String {
         str.to_owned()
     }
 }
+
+#[test]
+fn test() {
+   println!("{:?}",Local::now().format("%Y-%m-%d %H:%M:%S").to_string())
+}
