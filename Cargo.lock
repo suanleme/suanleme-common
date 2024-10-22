@@ -470,9 +470,9 @@ dependencies = [
 
 [[package]]
 name = "fusen-common"
-version = "0.6.9"
+version = "0.6.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "25dac6d234b02a8a0c738bf6ba1e304fd6019cb9a7278eadbe139af6cb84f7bb"
+checksum = "ce8ac4526635da713b7e3f0ad6be5beed08c3d0020500db3c158a039e82229c8"
 dependencies = [
  "bytes",
  "chrono",
@@ -503,15 +503,15 @@ dependencies = [
 
 [[package]]
 name = "fusen-derive-macro"
-version = "0.6.9"
+version = "0.6.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07e035c9ca74ed7c6bc2bef73469fb91e20e5effa2c75ecee9f6e4617679e19e"
+checksum = "e7752bc8e6cc35460ff17105d8dc0d59fd78410b2e217bb87e739ac9c6f7d394"
 
 [[package]]
 name = "fusen-procedural-macro"
-version = "0.6.9"
+version = "0.6.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7fc61a5a0047f6a1099a57ba0cc8ff0077fd8aa82fe69fc817d01928eadc1029"
+checksum = "61c8ac0aa5366585c2891479432986c5235ab43b5b38bd5d87b6d30ffb9a044f"
 dependencies = [
  "fusen-derive-macro",
  "proc-macro2",
@@ -523,9 +523,9 @@ dependencies = [
 
 [[package]]
 name = "fusen-rs"
-version = "0.6.9"
+version = "0.6.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7cdc99fcc413bc33026cd045668058de18f052a3249611a115a98e77944e4c4c"
+checksum = "aa580925bd0a60a15337f3a24479eee93bd097ae89e9b9bfb34b9d4dfaa8362f"
 dependencies = [
  "async-recursion",
  "async-trait",
@@ -782,9 +782,9 @@ checksum = "9a3a5bfb195931eeb336b2a7b4d761daec841b97f947d34394601737a7bba5e4"
 
 [[package]]
 name = "hyper"
-version = "1.4.1"
+version = "1.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "50dfd22e0e76d0f662d429a5f80fcaf3855009297eab6a0a9f8543834744ba05"
+checksum = "bbbff0a806a4728c99295b254c8838933b5b082d75e3cb70c8dab21fdfbcfa9a"
 dependencies = [
  "bytes",
  "futures-channel",
@@ -1931,7 +1931,7 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "suanleme-common"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "base64",
  "bytes",
@@ -1966,7 +1966,7 @@ dependencies = [
 
 [[package]]
 name = "suanleme-derive-macro"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1975,7 +1975,7 @@ dependencies = [
 
 [[package]]
 name = "suanleme-macro"
-version = "0.1.25"
+version = "0.1.26"
 dependencies = [
  "proc-macro2",
  "quote",

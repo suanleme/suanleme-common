@@ -1,7 +1,12 @@
+use std::collections::HashMap;
+
 use crate::{suanleme_macro::Data, utils::date_util::get_now_date_time_as_millis};
 use bytes::Bytes;
 use fusen_rs::{
-    filter::ProceedingJoinPoint, fusen_common::{self, FusenContext, FusenRequest}, fusen_procedural_macro::handler, handler::aspect::Aspect
+    filter::ProceedingJoinPoint,
+    fusen_common::{self, FusenContext, FusenRequest},
+    fusen_procedural_macro::handler,
+    handler::aspect::Aspect,
 };
 use opentelemetry::propagation::text_map_propagator::TextMapPropagator;
 use opentelemetry::{trace::TraceContextExt, Context};
@@ -72,7 +77,7 @@ impl LogAspect {
 impl Aspect for LogAspect {
     async fn aroud(
         &self,
-        mut join_point: ProceedingJoinPoint
+        mut join_point: ProceedingJoinPoint,
     ) -> Result<fusen_common::FusenContext, fusen_rs::Error> {
         let context = join_point.get_mut_context();
         let mut span_context = self.get_trace_context_propagator().extract_with_context(
@@ -113,7 +118,7 @@ impl Aspect for LogAspect {
                 let mut context = FusenContext::new(
                     "unique_identifier".to_owned(),
                     Default::default(),
-                    FusenRequest::new(None, Bytes::new()),
+                    FusenRequest::new("", HashMap::new(), Bytes::new()),
                     Default::default(),
                 );
                 *context.get_mut_response().get_mut_response() = Ok(Bytes::copy_from_slice(
