@@ -1,12 +1,9 @@
 use chrono::Local;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry::{trace::TraceError, StringValue, Value};
-use opentelemetry_otlp::WithExportConfig;
-use opentelemetry_sdk::{
-    runtime,
-    trace::{Config, TracerProvider as Tracer},
-    Resource,
-};
+use opentelemetry_otlp::{SpanExporter, WithExportConfig};
+use opentelemetry_sdk::trace::Config;
+use opentelemetry_sdk::{runtime, trace::TracerProvider as Tracer, Resource};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use suanleme_macro::Data;
@@ -44,20 +41,19 @@ impl Drop for LogWorkGroup {
 }
 
 fn init_opentelemetry_trace(otlp_url: &str, app_name: &str) -> Result<Tracer, TraceError> {
-    opentelemetry_otlp::new_pipeline()
-        .tracing()
-        .with_exporter(
-            opentelemetry_otlp::new_exporter()
-                .tonic()
-                .with_endpoint(otlp_url),
-        )
-        .with_trace_config(Config::default().with_resource(Resource::new(vec![
+    let exporter = SpanExporter::builder()
+        .with_tonic()
+        .with_endpoint(otlp_url)
+        .build()?;
+    Ok(Tracer::builder()
+        .with_batch_exporter(exporter, runtime::Tokio)
+        .with_config(Config::default().with_resource(Resource::new(vec![
             opentelemetry::KeyValue::new(
                 "service.name",
                 Value::String(StringValue::from(app_name.to_owned())),
             ),
         ])))
-        .install_batch(runtime::Tokio)
+        .build())
 }
 
 pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<LogWorkGroup> {
@@ -160,5 +156,5 @@ pub fn limit_str(str: &str, limit: usize) -> String {
 
 #[test]
 fn test() {
-   println!("{:?}",Local::now().format("%Y-%m-%d %H:%M:%S").to_string())
+    println!("{:?}", Local::now().format("%Y-%m-%d %H:%M:%S").to_string())
 }

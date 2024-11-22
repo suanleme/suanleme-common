@@ -1,7 +1,7 @@
 use redis::{aio::ConnectionManager, AsyncCommands, RedisError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use std::str::FromStr;
+use std::{collections::HashMap, fmt::Debug, str::FromStr};
 use suanleme_macro::Data;
 use tracing::{debug, instrument};
 
@@ -117,4 +117,78 @@ impl RedisClient {
             connect: self.connect.clone(),
         })
     }
+
+    const HSETEX: &str = r#"
+        redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+        return redis.call('HEXPIRE', KEYS[1], ARGV[3], 'FIELDS', '1' , ARGV[1])
+    "#;
+
+    #[instrument(name = "redis set_hash", skip(self))]
+    pub async fn set_hash<V>(
+        &mut self,
+        key: &str,
+        field: &str,
+        value: V,
+        seconds: i64,
+    ) -> Result<i64, BoxError>
+    where
+        V: redis::FromRedisValue
+            + std::cmp::Eq
+            + std::hash::Hash
+            + redis::ToRedisArgs
+            + std::marker::Send
+            + std::marker::Sync
+            + Debug,
+    {
+        if seconds >= 0 {
+            redis::Script::new(Self::HSETEX)
+                .key(key)
+                .arg(field)
+                .arg(value)
+                .arg(seconds)
+                .invoke_async::<Vec<i64>>(&mut self.connect)
+                .await
+                .map_err(|e| e.into())
+                .map(|e| e.first().cloned().unwrap_or(0))
+        } else {
+            self.connect
+                .hset(key, field, value)
+                .await
+                .map_err(|e| e.into())
+        }
+    }
+
+    #[instrument(name = "redis get_hash_all", skip(self))]
+    pub async fn get_hash_all<V>(&mut self, key: &str) -> Result<HashMap<String, V>, BoxError>
+    where
+        V: redis::FromRedisValue,
+    {
+        self.connect.hgetall(key).await.map_err(|e| e.into())
+    }
+
+    #[instrument(name = "redis get_hash_field", skip(self))]
+    pub async fn get_hash_field<V>(&mut self, key: &str, field: &str) -> Result<Option<V>, BoxError>
+    where
+        V: redis::FromRedisValue,
+    {
+        self.connect.hget(key, field).await.map_err(|e| e.into())
+    }
+}
+
+#[tokio::test]
+async fn test() {
+    let mut redis = init_redis_client(&RedisConfig {
+        db: 0,
+        host: "127.0.0.1:6379".to_string(),
+        username: None,
+        password: None,
+    })
+    .await
+    .unwrap();
+    let re = redis.set_hash("dasd", "dsds", 4, 0).await;
+    println!("{:?}", re);
+    let _re = redis.set_hash("dasd", "dsds2", 2, 10).await;
+    let _re = redis.get_hash_all::<String>("dasd").await;
+    // let re = redis.get_hash_field::<String>("dasd","dsds2").await;
+    println!("{:?}", re);
 }

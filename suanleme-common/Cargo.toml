@@ -1,6 +1,6 @@
 [package]
 name = "suanleme-common"
-version.workspace = true
+version = "0.1.27"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -12,21 +12,21 @@ suanleme-derive-macro.workspace = true
 fusen-rs = "0.6.14"
 
 #网络协议处理
-tokio = { version = "1.38.1", features = ["full"] }
-bytes = "1.7.1"
+tokio = { version = "1.41.1", features = ["full"] }
+bytes = "1.8.0"
 
 #json序列化
-serde = { version = "1.0.204", features = ["derive"] }
-serde_json = "1.0.120"
+serde = { version = "1.0.215", features = ["derive"] }
+serde_json = "1.0.133"
 serde_yaml = "0.9.34"
 
 #nacos配置中心
-nacos-sdk = { version = "0.4.0", features = ["default"] }
+nacos-sdk = { version = "0.4.2", features = ["default"] }
 
 #日志处理
-log = "0.4.21"
-tracing = "0.1.13"
-tracing-futures = { version = "0.2.3" }
+log = "0.4.22"
+tracing = "0.1.40"
+tracing-futures = { version = "0.2.5" }
 tracing-subscriber = { version = "0.3.18", features = [
     "json",
     "env-filter",
@@ -34,21 +34,21 @@ tracing-subscriber = { version = "0.3.18", features = [
 ] }
 pretty_env_logger = "0.5.0"
 tracing-appender = "0.2.3"
-tracing-opentelemetry = "0.27.0"
-opentelemetry = "0.26.0"
-opentelemetry_sdk = { version = "0.26.0", features = ["rt-tokio"] }
-opentelemetry-otlp = "0.26.0"
+tracing-opentelemetry = "0.28.0"
+opentelemetry = "0.27.0"
+opentelemetry_sdk = { version = "0.27.0", features = ["rt-tokio"] }
+opentelemetry-otlp = "0.27.0"
 
 #其他
 lazy_static = "1.5.0"
-toml = "0.8.15"
-uuid = { version = "1.10.0", features = ["v4"] }
+toml = "0.8.19"
+uuid = { version = "1.11.0", features = ["v4"] }
 
 #时间
 chrono = "0.4.38"
 
 #redis
-redis = { version = "0.27.0", features = ["tokio-comp","connection-manager"] }
+redis = { version = "0.27.5", features = ["tokio-comp","connection-manager"] }
 
 #加解密
 rsa = "0.9.6"

@@ -1,6 +1,6 @@
 [package]
 name = "suanleme-macro"
-version.workspace = true
+version = "0.1.15"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
