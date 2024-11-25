@@ -136,19 +136,25 @@ pub fn get_trace_id() -> String {
 }
 
 pub fn mask_str(str: &str) -> String {
-    let len = str.len();
+    let len = str.chars().by_ref().count();
     let split = len / 2;
     let split2 = split / 2;
     let mut res = String::new();
-    res.push_str(&str[..split2]);
+    let mut chars = str.chars();
+    res.extend(chars.by_ref().take(split2));
     res.push_str(&"*".repeat(split));
-    res.push_str(&str[split2 + split..]);
+    let _ = chars.by_ref().take(split).count();
+    res.extend(chars);
     res
 }
 
 pub fn limit_str(str: &str, limit: usize) -> String {
-    if str.len() > limit {
-        format!("{}..", &str[..limit])
+    let len = str.chars().by_ref().count();
+    if len > limit {
+        let mut chars = str.chars();
+        let mut string = chars.by_ref().take(limit).collect::<String>();
+        string.push_str("..");
+        string
     } else {
         str.to_owned()
     }
@@ -156,5 +162,12 @@ pub fn limit_str(str: &str, limit: usize) -> String {
 
 #[test]
 fn test() {
-    println!("{:?}", Local::now().format("%Y-%m-%d %H:%M:%S").to_string())
+    let str = "瓦达是的";
+    let mut chars = str.chars();
+    println!("{:?}", chars);
+    let mut res = String::new();
+    res.extend(chars.by_ref().take(2));
+    println!("{:?}", res);
+
+    println!("{:?}", chars);
 }
