@@ -1,11 +1,12 @@
-use redis::{aio::ConnectionManager, AsyncCommands, RedisError};
+use crate::{error::BoxError, shutdown::Shutdown};
+use log::info;
+use redis::{aio::ConnectionManager, cmd, AsyncCommands, RedisError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
-use std::{collections::HashMap, fmt::Debug, str::FromStr};
+use std::{collections::HashMap, fmt::Debug, str::FromStr, time::Duration};
 use suanleme_macro::Data;
+use tokio::sync::broadcast::{self, Sender};
 use tracing::{debug, instrument};
-
-use crate::error::BoxError;
 
 pub struct Lock {
     key: String,
@@ -38,16 +39,36 @@ pub async fn init_redis_client(config: &RedisConfig) -> Result<RedisClient, Redi
     } else {
         format!("redis://{}/{}", config.host, config.db)
     };
+    let connection_manager = redis::Client::open(redis_url)?
+        .get_connection_manager()
+        .await?;
+    //进行心跳检测
+    let mut connect_clone = connection_manager.clone();
+    let (s, _) = broadcast::channel::<()>(1);
+    let mut shutdown = Shutdown::new(s.subscribe());
+    tokio::spawn(async move {
+        loop {
+            tokio::select! {
+                _ = tokio::time::sleep(Duration::from_secs(5)) => {},
+                _ = shutdown.recv() => {
+                    info!("redis client close !");
+                    return ;
+                }
+            }
+            let result = cmd("PING").query_async::<String>(&mut connect_clone).await;
+            debug!("redis client ping ~ : {:?}", result);
+        }
+    });
     Ok(RedisClient {
-        connect: redis::Client::open(redis_url)?
-            .get_connection_manager()
-            .await?,
+        connect: connection_manager,
+        _ref: s,
     })
 }
 
 #[derive(Clone)]
 pub struct RedisClient {
     connect: ConnectionManager,
+    _ref: Sender<()>,
 }
 
 impl RedisClient {
@@ -173,22 +194,4 @@ impl RedisClient {
     {
         self.connect.hget(key, field).await.map_err(|e| e.into())
     }
-}
-
-#[tokio::test]
-async fn test() {
-    let mut redis = init_redis_client(&RedisConfig {
-        db: 0,
-        host: "127.0.0.1:6379".to_string(),
-        username: None,
-        password: None,
-    })
-    .await
-    .unwrap();
-    let re = redis.set_hash("dasd", "dsds", 4, 0).await;
-    println!("{:?}", re);
-    let _re = redis.set_hash("dasd", "dsds2", 2, 10).await;
-    let _re = redis.get_hash_all::<String>("dasd").await;
-    // let re = redis.get_hash_field::<String>("dasd","dsds2").await;
-    println!("{:?}", re);
 }

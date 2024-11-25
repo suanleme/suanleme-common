@@ -131,3 +131,25 @@ fn test3() {
             .password("qwer1234".to_owned())
     );
 }
+
+
+#[tokio::test]
+async fn test4() {
+    println!("das");
+    let mut redis = init_redis_client(&RedisConfig {
+        db: 0,
+        host: "127.0.0.1:6379".to_string(),
+        username: None,
+        password: None,
+    })
+    .await
+    .unwrap();
+    let re = redis.set_hash("dasd", "dsds", 4, 0).await;
+    println!("{:?}", re);
+    let _re = redis.set_hash("dasd", "dsds2", 2, 10).await;
+    let _re = redis.get_hash_all::<String>("dasd").await;
+    // let re = redis.get_hash_field::<String>("dasd","dsds2").await;
+    drop(redis);
+    tokio::time::sleep(Duration::from_secs(60)).await;
+    println!("{:?}", re);
+}
