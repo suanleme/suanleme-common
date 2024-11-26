@@ -49,7 +49,7 @@ pub async fn init_redis_client(config: &RedisConfig) -> Result<RedisClient, Redi
     tokio::spawn(async move {
         loop {
             tokio::select! {
-                _ = tokio::time::sleep(Duration::from_secs(5)) => {},
+                _ = tokio::time::sleep(Duration::from_secs(60)) => {},
                 _ = shutdown.recv() => {
                     info!("redis client close !");
                     return ;
