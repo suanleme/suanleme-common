@@ -26,6 +26,8 @@ async fn main() {
     info!("{:?}", re);
     let _re = redis.set_hash("dasd", "dsds2", 2, 10).await;
     let _re = redis.get_hash_all::<String>("dasd").await;
+    let re = redis.del_hash_field("dasd","dsds2").await;
+    info!("{:?}", re);
     // let re = redis.get_hash_field::<String>("dasd","dsds2").await;
     let re_c = redis.clone();
     drop(redis);

@@ -196,10 +196,7 @@ impl RedisClient {
     }
 
     #[instrument(name = "redis del_hash_field", skip(self))]
-    pub async fn del_hash_field<V>(&mut self, key: &str, field: &str) -> Result<Option<V>, BoxError>
-    where
-        V: redis::FromRedisValue,
-    {
+    pub async fn del_hash_field(&mut self, key: &str, field: &str) -> Result<i64, BoxError> {
         self.connect.hdel(key, field).await.map_err(|e| e.into())
     }
 }
