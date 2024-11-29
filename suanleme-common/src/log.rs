@@ -2,7 +2,6 @@ use chrono::Local;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry::{trace::TraceError, StringValue, Value};
 use opentelemetry_otlp::{SpanExporter, WithExportConfig};
-use opentelemetry_sdk::trace::Config;
 use opentelemetry_sdk::{runtime, trace::TracerProvider as Tracer, Resource};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
@@ -46,13 +45,11 @@ fn init_opentelemetry_trace(otlp_url: &str, app_name: &str) -> Result<Tracer, Tr
         .with_endpoint(otlp_url)
         .build()?;
     Ok(Tracer::builder()
+        .with_resource(Resource::new(vec![opentelemetry::KeyValue::new(
+            "service.name",
+            Value::String(StringValue::from(app_name.to_owned())),
+        )]))
         .with_batch_exporter(exporter, runtime::Tokio)
-        .with_config(Config::default().with_resource(Resource::new(vec![
-            opentelemetry::KeyValue::new(
-                "service.name",
-                Value::String(StringValue::from(app_name.to_owned())),
-            ),
-        ])))
         .build())
 }
 

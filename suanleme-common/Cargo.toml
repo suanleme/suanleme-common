@@ -1,6 +1,6 @@
 [package]
 name = "suanleme-common"
-version = "0.1.32"
+version = "0.1.33"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -35,8 +35,8 @@ tracing-subscriber = { version = "0.3.18", features = [
 pretty_env_logger = "0.5.0"
 tracing-appender = "0.2.3"
 tracing-opentelemetry = "0.28.0"
-opentelemetry = "0.27.0"
-opentelemetry_sdk = { version = "0.27.0", features = ["rt-tokio"] }
+opentelemetry = "0.27.1"
+opentelemetry_sdk = { version = "0.27.1", features = ["rt-tokio"] }
 opentelemetry-otlp = "0.27.0"
 
 #其他
