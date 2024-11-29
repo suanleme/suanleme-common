@@ -1,5 +1,10 @@
 [workspace]
-members = ["suanleme-common", "suanleme-macro", "suanleme-derive-macro","examples"]
+members = [
+    "suanleme-common",
+    "suanleme-macro",
+    "suanleme-derive-macro",
+    "examples",
+]
 resolver = "2"
 
 [workspace.package]
