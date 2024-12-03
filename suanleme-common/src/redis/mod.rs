@@ -195,6 +195,20 @@ impl RedisClient {
         self.connect.hget(key, field).await.map_err(|e| e.into())
     }
 
+    #[instrument(name = "redis get_hash_field", skip(self))]
+    pub async fn get_hash_field_ttl(
+        &mut self,
+        key: &str,
+        field: &str,
+    ) -> Result<Option<Option<i64>>, BoxError> {
+        let result: Vec<i64> = self.connect.httl(key, field).await?;
+        Ok(match result.first().unwrap() {
+            -2 => None,
+            -1 => Some(None),
+            other => Some(Some(*other)),
+        })
+    }
+
     #[instrument(name = "redis del_hash_field", skip(self))]
     pub async fn del_hash_field(&mut self, key: &str, field: &str) -> Result<i64, BoxError> {
         self.connect.hdel(key, field).await.map_err(|e| e.into())

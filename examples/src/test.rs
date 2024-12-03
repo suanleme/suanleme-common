@@ -22,7 +22,8 @@ async fn main() {
     })
     .await
     .unwrap();
-    let re = redis.set_hash("dasd", "dsds", 4, 0).await;
+    let _re = redis.set_hash("dasd", "dsds1", 4, -1).await;
+    let re  = redis.get_hash_field_ttl("dasd", "dsds1").await.unwrap();
     info!("{:?}", re);
     let _re = redis.set_hash("dasd", "dsds2", 2, 10).await;
     let _re = redis.get_hash_all::<String>("dasd").await;
