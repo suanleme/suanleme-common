@@ -88,6 +88,16 @@ impl RedisClient {
         self.connect.get(key).await.map_err(|e| e.into())
     }
 
+    #[instrument(name = "redis get_ttl", skip(self))]
+    pub async fn get_ttl(&mut self, key: &str) -> Result<Option<Option<i64>>, BoxError> {
+        let result: i64 = self.connect.ttl(key).await?;
+        Ok(match result {
+            -2 => None,
+            -1 => Some(None),
+            other => Some(Some(other)),
+        })
+    }
+
     #[instrument(name = "redis set_ex", skip(self))]
     pub async fn set_ex(
         &mut self,
@@ -195,7 +205,7 @@ impl RedisClient {
         self.connect.hget(key, field).await.map_err(|e| e.into())
     }
 
-    #[instrument(name = "redis get_hash_field", skip(self))]
+    #[instrument(name = "redis get_hash_field_ttl", skip(self))]
     pub async fn get_hash_field_ttl(
         &mut self,
         key: &str,
