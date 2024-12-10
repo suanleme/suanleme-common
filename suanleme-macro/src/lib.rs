@@ -7,6 +7,7 @@ mod builder;
 mod config;
 mod data;
 mod debug;
+mod enum_for_str;
 
 #[proc_macro_attribute]
 pub fn builder(_attr: TokenStream, item: TokenStream) -> TokenStream {
@@ -21,6 +22,11 @@ pub fn hot_config(_attr: TokenStream, item: TokenStream) -> TokenStream {
 #[proc_macro_derive(Data)]
 pub fn data(item: TokenStream) -> TokenStream {
     data::data(item)
+}
+
+#[proc_macro_derive(EnumForStr)]
+pub fn enum_for_str(item: TokenStream) -> TokenStream {
+    enum_for_str::enum_for_str(item)
 }
 
 #[proc_macro_derive(StrategyDebug, attributes(strategy))]
