@@ -56,9 +56,9 @@ pub fn enum_for_str(input: TokenStream) -> TokenStream {
                 }
             }
         }
-        _ => {
-            panic!("only be used enum");
-        }
+        _ => syn::Error::new(enum_name.span(), "only be used enum")
+            .into_compile_error()
+            .into(),
     };
     ret.into()
 }

@@ -2246,7 +2246,7 @@ dependencies = [
 
 [[package]]
 name = "suanleme-macro"
-version = "0.1.16"
+version = "0.1.17"
 dependencies = [
  "proc-macro2",
  "quote",
