@@ -223,4 +223,26 @@ impl RedisClient {
     pub async fn del_hash_field(&mut self, key: &str, field: &str) -> Result<i64, BoxError> {
         self.connect.hdel(key, field).await.map_err(|e| e.into())
     }
+
+    const INCR: &str = r#"
+        local key = KEYS[1]
+        local ttl = tonumber(ARGV[1])
+        local currentValue = redis.call("INCR", key)
+        redis.call("EXPIRE", key, ttl)
+        return currentValue
+    "#;
+
+    #[instrument(name = "redis incr", skip(self))]
+    pub async fn incr(&mut self, key: &str, seconds: i64) -> Result<i64, BoxError> {
+        if seconds >= 0 {
+            redis::Script::new(Self::INCR)
+                .key(key)
+                .arg(seconds)
+                .invoke_async::<i64>(&mut self.connect)
+                .await
+                .map_err(|e| e.into())
+        } else {
+            self.connect.incr(key, 1).await.map_err(|e| e.into())
+        }
+    }
 }
