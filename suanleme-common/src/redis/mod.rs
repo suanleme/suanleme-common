@@ -1,12 +1,11 @@
 use crate::{error::BoxError, shutdown::Shutdown};
-use log::info;
 use redis::{aio::ConnectionManager, cmd, AsyncCommands, RedisError};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, fmt::Debug, str::FromStr, time::Duration};
 use suanleme_macro::Data;
 use tokio::sync::broadcast::{self, Sender};
-use tracing::{debug, instrument};
+use tracing::{debug, info, instrument};
 
 pub struct Lock {
     key: String,

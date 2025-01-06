@@ -1,6 +1,6 @@
 [package]
 name = "suanleme-common"
-version = "0.1.40"
+version = "0.1.41"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -24,7 +24,6 @@ serde_yaml = "0.9.34"
 nacos-sdk = { version = "0.4.2", features = ["default"] }
 
 #日志处理
-log = "0.4.22"
 tracing = "0.1.40"
 tracing-futures = { version = "0.2.5" }
 tracing-subscriber = { version = "0.3.18", features = [

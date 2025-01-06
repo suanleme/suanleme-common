@@ -2201,14 +2201,13 @@ checksum = "73473c0e59e6d5812c5dfe2a064a6444949f089e20eec9a2e5506596494e4623"
 
 [[package]]
 name = "suanleme-common"
-version = "0.1.40"
+version = "0.1.41"
 dependencies = [
  "base64",
  "bytes",
  "chrono",
  "fusen-rs",
  "lazy_static",
- "log",
  "nacos-sdk",
  "opentelemetry 0.27.1",
  "opentelemetry-otlp 0.27.0",
