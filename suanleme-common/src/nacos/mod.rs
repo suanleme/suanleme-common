@@ -261,6 +261,12 @@ pub struct Directory {
     sender: UnboundedSender<(DirectorySender, oneshot::Sender<DirectoryReceiver>)>,
 }
 
+impl Default for Directory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Directory {
     pub fn new() -> Self {
         let (s, mut r) =

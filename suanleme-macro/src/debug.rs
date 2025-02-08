@@ -51,12 +51,16 @@ pub fn debug(item: TokenStream) -> TokenStream {
             Err(error) => return error.into_compile_error().into(),
         };
         if strategy.ignore.is_some() {
-            //ignore
-        } else if strategy.mask.is_some()
-            && field.ty.to_token_stream().to_string().as_str() == "String"
-        {
             fields
-                .push(quote! {.field(#ident_name, &&suanleme_common::log::mask_str(&self.#ident))});
+               .push(quote! {.field(#ident_name, &"...")});
+        } else if strategy.mask.is_some() {   
+            if field.ty.to_token_stream().to_string().as_str() == "String" {
+                fields
+                 .push(quote! {.field(#ident_name, &&suanleme_common::log::mask_str(&self.#ident))});
+            } else {
+                fields
+                 .push(quote! {.field(#ident_name, &&suanleme_common::log::mask_str(&format!("{:?}",self.#ident)))});
+            };
         } else if let Some(limit) = strategy.limit {
             let limit = limit.parse::<usize>().unwrap();
             if field.ty.to_token_stream().to_string().as_str() == "String" {
