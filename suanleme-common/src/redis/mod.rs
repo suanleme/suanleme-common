@@ -83,12 +83,12 @@ impl RedisClient {
     }
 
     #[instrument(name = "redis get_str", skip(self))]
-    pub async fn get_str(&mut self, key: &str) -> Result<Option<String>, BoxError> {
-        self.connect.get(key).await.map_err(|e| e.into())
+    pub async fn get_str(&mut self, key: &str) -> Result<Option<String>, RedisError> {
+        self.connect.get(key).await
     }
 
     #[instrument(name = "redis get_ttl", skip(self))]
-    pub async fn get_ttl(&mut self, key: &str) -> Result<Option<Option<i64>>, BoxError> {
+    pub async fn get_ttl(&mut self, key: &str) -> Result<Option<Option<i64>>, RedisError> {
         let result: i64 = self.connect.ttl(key).await?;
         Ok(match result {
             -2 => None,
@@ -103,14 +103,11 @@ impl RedisClient {
         key: &str,
         value: &str,
         seconds: i64,
-    ) -> Result<String, BoxError> {
+    ) -> Result<String, RedisError> {
         if seconds < 0 {
-            self.connect.set(key, value).await.map_err(|e| e.into())
+            self.connect.set(key, value).await
         } else {
-            self.connect
-                .set_ex(key, value, seconds as u64)
-                .await
-                .map_err(|e| e.into())
+            self.connect.set_ex(key, value, seconds as u64).await
         }
     }
 
@@ -120,19 +117,16 @@ impl RedisClient {
         key: &str,
         value: &str,
         seconds: u64,
-    ) -> Result<String, BoxError> {
+    ) -> Result<String, RedisError> {
         let options = redis::SetOptions::default()
             .conditional_set(redis::ExistenceCheck::NX)
             .with_expiration(redis::SetExpiry::EX(seconds));
-        self.connect
-            .set_options(key, value, options)
-            .await
-            .map_err(|e| e.into())
+        self.connect.set_options(key, value, options).await
     }
 
     #[instrument(name = "redis delete", skip(self))]
-    pub async fn delete(&mut self, key: &str) -> Result<i64, BoxError> {
-        self.connect.del(key).await.map_err(|e| e.into())
+    pub async fn delete(&mut self, key: &str) -> Result<i64, RedisError> {
+        self.connect.del(key).await
     }
 
     #[instrument(name = "redis get_lock", skip(self))]
@@ -160,7 +154,7 @@ impl RedisClient {
         field: &str,
         value: V,
         seconds: i64,
-    ) -> Result<i64, BoxError>
+    ) -> Result<i64, RedisError>
     where
         V: redis::FromRedisValue
             + std::cmp::Eq
@@ -178,13 +172,40 @@ impl RedisClient {
                 .arg(seconds)
                 .invoke_async::<Vec<i64>>(&mut self.connect)
                 .await
-                .map_err(|e| e.into())
                 .map(|e| e.first().cloned().unwrap_or(0))
         } else {
-            self.connect
-                .hset(key, field, value)
-                .await
-                .map_err(|e| e.into())
+            self.connect.hset(key, field, value).await
+        }
+    }
+
+    #[instrument(name = "redis set_hash", skip(self))]
+    pub async fn set_all_hash(
+        &mut self,
+        key: &str,
+        items: &Vec<(&str, &str)>,
+        seconds: i64,
+    ) -> Result<(), BoxError> {
+        if seconds < 0 {
+            let result: String = self.connect.hset_multiple(key, items).await?;
+            if result.eq_ignore_ascii_case("OK") {
+                Ok(())
+            } else {
+                Err(format!("set_all_hash error : {:?}", result).into())
+            }
+        } else {
+            let mut pip = redis::pipe();
+            let mut cmd = cmd("HSET");
+            cmd.arg(key);
+            for (key, value) in items {
+                cmd.arg(key).arg(value);
+            }
+            pip.atomic().add_command(cmd).expire(key, seconds);
+            let result: Vec<i32> = pip.query_async(&mut self.connect).await?;
+            if result[0] == items.len() as i32 && result[1] == 1 {
+                Ok(())
+            } else {
+                Err(format!("set_all_hash error : {:?}", result).into())
+            }
         }
     }
 
