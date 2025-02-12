@@ -27,13 +27,13 @@ async fn main() {
     .await
     .unwrap();
     let _re = redis.set_hash("dasd", "dsds1", 4, -1).await;
-    let re  = redis.get_hash_field_ttl("dasd", "dsds1").await.unwrap();
+    let re = redis.get_hash_field_ttl("dasd", "dsds1").await.unwrap();
     info!("{:?}", re);
     let _re = redis.set_hash("dasd", "dsds2", 2, 10).await;
     let _re = redis.get_hash_all::<String>("dasd").await;
-    let re = redis.del_hash_field("dasd","dsds2").await;
+    let re = redis.del_hash_field("dasd", "dsds2").await;
     info!("{:?}", re);
-    let re = redis.get_hash_field::<String>("dasd","dsds2").await;
+    let re = redis.get_hash_field::<String>("dasd", "dsds2").await;
     let re_c = redis.clone();
     // drop(redis);
     tokio::time::sleep(Duration::from_secs(10)).await;
@@ -46,6 +46,10 @@ async fn main() {
     hash.insert("k2", "k-02");
     let result = redis
         .set_all_hash("key1", &hash.into_iter().collect::<Vec<(&str, &str)>>(), 10)
+        .await;
+    println!("{:?}", result);
+    let result = redis
+        .set_hash_xx("key", "ewe1", "ewew7".to_string(), -1)
         .await;
     println!("{:?}", result);
 }

@@ -178,7 +178,61 @@ impl RedisClient {
         }
     }
 
-    #[instrument(name = "redis set_hash", skip(self))]
+    const HSETNXEX: &str = r#"
+    if redis.call('EXISTS', KEYS[1]) == 1 then 
+        redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+        return redis.call('HEXPIRE', KEYS[1], ARGV[3], 'FIELDS', '1' , ARGV[1])
+    else 
+       return 0
+    end
+    "#;
+
+    const HSETNX: &str = r#"
+    if redis.call('EXISTS', KEYS[1]) == 1 then 
+        redis.call('HSET', KEYS[1], ARGV[1], ARGV[2])
+        return 1
+    else 
+       return 0
+    end
+    "#;
+
+    #[instrument(name = "redis set_hash_xx", skip(self))]
+    pub async fn set_hash_xx<V>(
+        &mut self,
+        key: &str,
+        field: &str,
+        value: V,
+        seconds: i64,
+    ) -> Result<i64, RedisError>
+    where
+        V: redis::FromRedisValue
+            + std::cmp::Eq
+            + std::hash::Hash
+            + redis::ToRedisArgs
+            + std::marker::Send
+            + std::marker::Sync
+            + Debug,
+    {
+        if seconds >= 0 {
+            redis::Script::new(Self::HSETNXEX)
+                .key(key)
+                .arg(field)
+                .arg(value)
+                .arg(seconds)
+                .invoke_async::<Vec<i64>>(&mut self.connect)
+                .await
+                .map(|e| e.first().cloned().unwrap_or(0))
+        } else {
+            redis::Script::new(Self::HSETNX)
+                .key(key)
+                .arg(field)
+                .arg(value)
+                .invoke_async::<i64>(&mut self.connect)
+                .await
+        }
+    }
+
+    #[instrument(name = "redis set_all_hash", skip(self))]
     pub async fn set_all_hash(
         &mut self,
         key: &str,
