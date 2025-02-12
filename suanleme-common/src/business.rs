@@ -4,19 +4,20 @@ use crate::utils::date_util::get_now_date_time_as_millis;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Data)]
 pub struct CommonRequest<T> {
-    version: Option<String>,
-    user_id: Option<i64>,
-    token: Option<String>,
-    sign_str: Option<String>,
-    timestamp: u128,
-    data: Option<T>,
+    pub version: Option<String>,
+    pub user_id: Option<i64>,
+    pub tenant: Option<Tenant>,
+    pub token: Option<String>,
+    pub sign_str: Option<String>,
+    pub timestamp: u128,
+    pub data: Option<T>,
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Data)]
 pub struct CommonResponse<T> {
-    code: String,
-    message: Option<String>,
-    data: Option<T>,
+    pub code: String,
+    pub message: Option<String>,
+    pub data: Option<T>,
 }
 
 impl<T> CommonResponse<T> {
@@ -28,6 +29,15 @@ impl<T> CommonResponse<T> {
         } = self;
         data
     }
+}
+
+#[derive(Default, Clone, serde::Serialize, serde::Deserialize, Debug)]
+pub struct Tenant {
+    pub tenant_id: i64,
+    pub tenant_type: String,
+    pub tenant_name: String,
+    pub permission: String,
+    pub is_admin: bool,
 }
 
 impl<T: serde::Serialize> From<CommonResponse<T>> for serde_json::Value {
@@ -44,6 +54,7 @@ impl<T> Default for CommonRequest<T> {
         Self {
             version: Default::default(),
             user_id: Default::default(),
+            tenant: Default::default(),
             token: Default::default(),
             sign_str: Default::default(),
             timestamp: get_now_date_time_as_millis(),
