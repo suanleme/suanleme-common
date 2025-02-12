@@ -197,21 +197,17 @@ impl RedisClient {
     "#;
 
     #[instrument(name = "redis set_hash_xx", skip(self))]
-    pub async fn set_hash_xx<V>(
+    pub async fn set_hash_xx<K, F, V>(
         &mut self,
-        key: &str,
-        field: &str,
+        key: K,
+        field: F,
         value: V,
         seconds: i64,
     ) -> Result<i64, RedisError>
     where
-        V: redis::FromRedisValue
-            + std::cmp::Eq
-            + std::hash::Hash
-            + redis::ToRedisArgs
-            + std::marker::Send
-            + std::marker::Sync
-            + Debug,
+        K: redis::ToRedisArgs + Debug,
+        F: redis::ToRedisArgs + Debug,
+        V: redis::ToRedisArgs + Debug,
     {
         if seconds >= 0 {
             redis::Script::new(Self::HSETNXEX)
@@ -233,12 +229,17 @@ impl RedisClient {
     }
 
     #[instrument(name = "redis set_all_hash", skip(self))]
-    pub async fn set_all_hash(
+    pub async fn set_all_hash<K, F, V>(
         &mut self,
-        key: &str,
-        items: &Vec<(&str, &str)>,
+        key: K,
+        items: &Vec<(F, V)>,
         seconds: i64,
-    ) -> Result<(), BoxError> {
+    ) -> Result<(), BoxError>
+    where
+        K: redis::ToRedisArgs + Debug + std::marker::Sync + std::marker::Send + std::marker::Copy,
+        F: redis::ToRedisArgs + Debug + std::marker::Sync + std::marker::Send,
+        V: redis::ToRedisArgs + Debug + std::marker::Sync + std::marker::Send,
+    {
         if seconds < 0 {
             let result: String = self.connect.hset_multiple(key, items).await?;
             if result.eq_ignore_ascii_case("OK") {

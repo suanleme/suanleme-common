@@ -41,15 +41,15 @@ async fn main() {
     tokio::time::sleep(Duration::from_secs(1200)).await;
     info!("{:?}", re);
     let mut hash = HashMap::new();
-    hash.insert("k", "k-0");
-    hash.insert("k1", "k-01");
-    hash.insert("k2", "k-02");
+    hash.insert("String1".to_owned(), "k-0".to_owned());
+    hash.insert("String2".to_owned(), "k-01".to_owned());
+    hash.insert("String3".to_owned(), "k-02".to_owned());
     let result = redis
-        .set_all_hash("key1", &hash.into_iter().collect::<Vec<(&str, &str)>>(), 10)
+        .set_all_hash(&"ds".to_string(), &hash.iter().collect::<Vec<(_, _)>>(), 10)
         .await;
     println!("{:?}", result);
     let result = redis
-        .set_hash_xx("key", "ewe1", "ewew7".to_string(), -1)
+        .set_hash_xx("ds", "ewe1", "ewew7".to_string(), 9)
         .await;
     println!("{:?}", result);
 }
