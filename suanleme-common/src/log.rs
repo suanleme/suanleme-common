@@ -6,6 +6,7 @@ use opentelemetry_sdk::{runtime, trace::TracerProvider as Tracer, Resource};
 use serde::{Deserialize, Serialize};
 use std::str::FromStr;
 use suanleme_macro::Data;
+use tracing::error;
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
@@ -54,6 +55,9 @@ fn init_opentelemetry_trace(otlp_url: &str, app_name: &str) -> Result<Tracer, Tr
 }
 
 pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<LogWorkGroup> {
+    std::panic::set_hook(Box::new(|error| {
+        error!("panic : {:?}", error.to_string());
+    }));
     let mut worker_guard = None;
     let mut tracer_guard = None;
     let mut layter_list = vec![];
