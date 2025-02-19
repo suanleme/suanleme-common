@@ -33,6 +33,8 @@ impl<T> CommonResponse<T> {
 
 #[derive(Default, Clone, serde::Serialize, serde::Deserialize, Debug)]
 pub struct Tenant {
+    pub merchant_id: i64,
+    pub merchant_name: i64,
     pub tenant_id: i64,
     pub tenant_type: String,
     pub tenant_name: String,
