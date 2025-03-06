@@ -1,6 +1,6 @@
 [package]
 name = "suanleme-common"
-version = "0.1.49"
+version = "0.1.50"
 authors.workspace = true
 edition.workspace = true
 license.workspace = true
@@ -9,22 +9,22 @@ description.workspace = true
 [dependencies]
 suanleme-macro.workspace = true
 suanleme-derive-macro.workspace = true
-fusen-rs = "0.6.15"
+fusen-rs = "0.6.20"
 
 #网络协议处理
-tokio = { version = "1.41.1", features = ["full"] }
-bytes = "1.8.0"
+tokio = { version = "1.43.0", features = ["full"] }
+bytes = "1.10.1"
 
 #json序列化
-serde = { version = "1.0.215", features = ["derive"] }
-serde_json = "1.0.133"
+serde = { version = "1.0.218", features = ["derive"] }
+serde_json = "1.0.140"
 serde_yaml = "0.9.34"
 
 #nacos配置中心
-nacos-sdk = { version = "0.4.2", features = ["default"] }
+nacos-sdk = { version = "0.4.3", features = ["default"] }
 
 #日志处理
-tracing = "0.1.40"
+tracing = "0.1.41"
 tracing-futures = { version = "0.2.5" }
 tracing-subscriber = { version = "0.3.19", features = [
     "json",
@@ -44,11 +44,11 @@ opentelemetry-otlp = { version = "0.28.0", features = ["grpc-tonic"] }
 
 #其他
 lazy_static = "1.5.0"
-toml = "0.8.19"
-uuid = { version = "1.11.0", features = ["v4"] }
+toml = "0.8.20"
+uuid = { version = "1.15.1", features = ["v4"] }
 
 #时间
-chrono = "0.4.38"
+chrono = "0.4.40"
 
 #redis
 redis = { version = "0.29.1", features = [
@@ -59,8 +59,8 @@ redis = { version = "0.29.1", features = [
 r2d2 = "0.8.10"
 
 #加解密
-rsa = "0.9.6"
+rsa = "0.9.7"
 sha2 = { version = "0.10.8", features = ["oid"] }
 rand = "0.9.0"
 base64 = "0.22.1"
-ring = "0.17.8"
+ring = "0.17.12"
