@@ -1,9 +1,9 @@
 use crate::error::BoxError;
 use base64::{prelude::BASE64_STANDARD, Engine};
-use rand::rngs::OsRng;
 use rsa::{
     pkcs1::{DecodeRsaPrivateKey, DecodeRsaPublicKey, EncodeRsaPrivateKey, EncodeRsaPublicKey},
     pkcs8::{DecodePrivateKey, DecodePublicKey},
+    rand_core::OsRng,
     BigUint, Pkcs1v15Encrypt, Pkcs1v15Sign, RsaPrivateKey, RsaPublicKey,
 };
 use serde_json::Value;
