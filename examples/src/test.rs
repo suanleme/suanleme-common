@@ -29,9 +29,14 @@ async fn main() {
     let _re = redis.set_hash("dasd", "dsds1", 4, -1).await;
     let re = redis.get_hash_field_ttl("dasd", "dsds1").await.unwrap();
     info!("{:?}", re);
-    let _re = redis.set_hash("dasd", "dsds2", 2, 10).await;
+    let _re = redis.set_hash("dasd", "dsds2", 2, 1000).await;
     let _re = redis.get_hash_all::<String>("dasd").await;
-    let re = redis.del_hash_field("dasd", "dsds2").await;
+    let de = vec!["dsds2", "111"];
+    let re = redis
+        .get_hash_fields::<String, _>("dasd", de.as_slice())
+        .await;
+    info!("{:?}", re);
+    let re = redis.get_hash_field::<String>("dasd", "111").await;
     info!("{:?}", re);
     let re = redis.get_hash_field::<String>("dasd", "dsds2").await;
     let re_c = redis.clone();

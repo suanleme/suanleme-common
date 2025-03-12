@@ -1,5 +1,5 @@
 use crate::{error::BoxError, shutdown::Shutdown};
-use redis::{aio::ConnectionManager, cmd, AsyncCommands, RedisError};
+use redis::{aio::ConnectionManager, cmd, AsyncCommands, RedisError, ToRedisArgs};
 use serde::{de::DeserializeOwned, Deserialize, Serialize};
 use serde_json::Value;
 use std::{collections::HashMap, fmt::Debug, str::FromStr, time::Duration};
@@ -278,6 +278,19 @@ impl RedisClient {
         V: redis::FromRedisValue,
     {
         self.connect.hget(key, field).await.map_err(|e| e.into())
+    }
+
+    #[instrument(name = "redis get_hash_fields", skip(self))]
+    pub async fn get_hash_fields<V, F>(
+        &mut self,
+        key: &str,
+        fields: F,
+    ) -> Result<Vec<Option<V>>, BoxError>
+    where
+        V: redis::FromRedisValue,
+        F: ToRedisArgs + std::marker::Send + std::marker::Sync + Debug,
+    {
+        self.connect.hget(key, fields).await.map_err(|e| e.into())
     }
 
     #[instrument(name = "redis get_hash_field_ttl", skip(self))]
