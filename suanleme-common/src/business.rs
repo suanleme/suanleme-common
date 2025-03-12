@@ -3,6 +3,15 @@ use suanleme_macro::Data;
 use crate::utils::date_util::get_now_date_time_as_millis;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Data)]
+pub struct MerchantCommonRequest<T> {
+    pub version: Option<String>,
+    pub user_id: Option<i64>,
+    pub merchant: Option<Merchant>,
+    pub timestamp: u128,
+    pub data: Option<T>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Data)]
 pub struct CommonRequest<T> {
     pub version: Option<String>,
     pub user_id: Option<i64>,
@@ -38,6 +47,13 @@ pub struct Tenant {
     pub tenant_name: String,
     pub permission: String,
     pub is_admin: bool,
+}
+
+#[derive(Default, Clone, serde::Serialize, serde::Deserialize, Debug)]
+pub struct Merchant {
+    pub id: i64,
+    pub token: String,
+    pub merchant_mark: String,
 }
 
 impl<T: serde::Serialize> From<CommonResponse<T>> for serde_json::Value {
