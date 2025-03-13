@@ -3,18 +3,10 @@ use suanleme_macro::Data;
 use crate::utils::date_util::get_now_date_time_as_millis;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Data)]
-pub struct MerchantCommonRequest<T> {
-    pub version: Option<String>,
-    pub user_id: Option<i64>,
-    pub merchant: Option<Merchant>,
-    pub timestamp: u128,
-    pub data: Option<T>,
-}
-
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Data)]
 pub struct CommonRequest<T> {
     pub version: Option<String>,
     pub user_id: Option<i64>,
+    pub merchant: Option<Merchant>,
     pub tenant: Option<Tenant>,
     pub token: Option<String>,
     pub sign_str: Option<String>,
@@ -70,6 +62,7 @@ impl<T> Default for CommonRequest<T> {
         Self {
             version: Default::default(),
             user_id: Default::default(),
+            merchant: Default::default(),
             tenant: Default::default(),
             token: Default::default(),
             sign_str: Default::default(),
