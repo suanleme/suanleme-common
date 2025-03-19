@@ -46,8 +46,7 @@ where
                         let _ = msg.1.send(CacheReceiver::Get(cache.as_ref().cloned()));
                     }
                     CacheSender::Insert(value) => {
-                        let old_value = cache.take();
-                        let _ = cache.insert(value);
+                        let old_value = cache.replace(value);
                         let _ = msg.1.send(CacheReceiver::Insert(old_value));
                     }
                     CacheSender::Clean => {
