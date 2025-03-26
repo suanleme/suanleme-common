@@ -1,10 +1,9 @@
 use chrono::Local;
-use opentelemetry::global::ObjectSafeSpan;
 use opentelemetry::trace::TracerProvider;
 use opentelemetry::{StringValue, Value};
 use opentelemetry_otlp::{ExporterBuildError, SpanExporter, WithExportConfig};
 use opentelemetry_sdk::runtime;
-use opentelemetry_sdk::trace::{span_processor_with_async_runtime, Span};
+use opentelemetry_sdk::trace::span_processor_with_async_runtime;
 use opentelemetry_sdk::{trace::SdkTracerProvider, Resource};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -214,10 +213,6 @@ where
     fn on_close(&self, id: tracing::span::Id, ctx: tracing_subscriber::layer::Context<'_, S>) {
         // 在 span 关闭时计算耗时
         ctx.span(&id).map(|span| {
-            let tracing_id = span
-                .extensions()
-                .get::<Span>()
-                .map(|span| span.span_context().trace_id().to_string());
             span.extensions().get::<TempStatus>().map(|temp| {
                 let duration = temp.time.elapsed().as_millis();
                 let span_name = span.name();
@@ -226,10 +221,9 @@ where
                     .as_ref()
                     .map(|e| e.as_str())
                     .unwrap_or("unknown");
-                let trace_id = tracing_id.as_deref().unwrap_or("unknown");
                 //unknown
                 info!(
-                    trace_id = trace_id,
+                    log_type = "span_timer",
                     span_name = &span_name,
                     span_type = &span_type,
                     elapsed = &duration
