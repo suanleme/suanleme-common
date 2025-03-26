@@ -14,7 +14,6 @@ use tracing::{debug, debug_span, info};
 #[hot_config]
 pub struct AppCfg {
     pub server_port: u16,
-    pub datasource: DatasourceConfig,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -29,11 +28,11 @@ pub struct SuanlemeDb {
     pub password: Option<String>,
 }
 
-#[tokio::test]
-async fn test() {
+#[tokio::main]
+async fn main() {
     let _logwork = suanleme_common::log::init_log(
         &LogConfig::default()
-            .env_filter(Some("config_test=debug".to_owned()))
+            .env_filter(None)
             .path(Some(
                 "/Users/kwsc98/Desktop/workspace/gitlab/suanleme-common/log".to_owned(),
             ))
@@ -51,24 +50,23 @@ async fn test() {
     )
     .await
     .unwrap();
-    //只需要加载一次配置的话使用get_config即可
-    let config1: AppCfg = nacos_config
-        .get_config("suanlema-common:DEFAULT_GROUP")
-        .await
-        .unwrap();
-    debug!("{:?}", config1);
+    // //只需要加载一次配置的话使用get_config即可
+    // let config1: AppCfg = nacos_config
+    //     .get_config("suanlema-common:DEFAULT_GROUP")
+    //     .await
+    //     .unwrap();
+    debug!("{:?}", 111);
     //需要进行热配置读取的话,则使用get_hot_config即可
-    let config2: AppCfg = nacos_config
-        .get_hot_config("suanlema-common:DEFAULT_GROUP")
-        .await
-        .unwrap();
-    debug!("{:?}", config1);
+    // let config2: AppCfg = nacos_config
+    //     .get_hot_config("suanlema-common:DEFAULT_GROUP")
+    //     .await
+    //     .unwrap();
     drop(_enter);
     drop(span);
-    loop {
-        info!("{:?}", config2.get_hot_config().await);
-        tokio::time::sleep(Duration::from_secs(2)).await;
-    }
+    // loop {
+    //     info!("{:?}", config2.get_hot_config().await);
+    //     tokio::time::sleep(Duration::from_secs(2)).await;
+    // }
 }
 
 #[tokio::test]
@@ -131,7 +129,6 @@ fn test3() {
             .password("qwer1234".to_owned())
     );
 }
-
 
 #[tokio::test]
 async fn test4() {

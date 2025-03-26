@@ -1,14 +1,18 @@
 use chrono::Local;
+use opentelemetry::global::ObjectSafeSpan;
 use opentelemetry::trace::TracerProvider;
-use opentelemetry::{trace::TraceError, StringValue, Value};
-use opentelemetry_otlp::{SpanExporter, WithExportConfig};
+use opentelemetry::{StringValue, Value};
+use opentelemetry_otlp::{ExporterBuildError, SpanExporter, WithExportConfig};
 use opentelemetry_sdk::runtime;
-use opentelemetry_sdk::trace::span_processor_with_async_runtime;
+use opentelemetry_sdk::trace::{span_processor_with_async_runtime, Span};
 use opentelemetry_sdk::{trace::SdkTracerProvider, Resource};
 use serde::{Deserialize, Serialize};
+use std::fmt::Debug;
 use std::str::FromStr;
 use suanleme_macro::Data;
-use tracing::error;
+use tokio::time::Instant;
+use tracing::field::Field;
+use tracing::{error, info, Subscriber};
 use tracing_appender::{
     non_blocking::WorkerGuard,
     rolling::{RollingFileAppender, Rotation},
@@ -16,6 +20,7 @@ use tracing_appender::{
 use tracing_opentelemetry::OpenTelemetryLayer;
 use tracing_subscriber::fmt::format::Writer;
 use tracing_subscriber::fmt::time::FormatTime;
+use tracing_subscriber::registry::LookupSpan;
 use tracing_subscriber::EnvFilter;
 use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, Layer};
 
@@ -45,7 +50,7 @@ impl Drop for LogWorkGroup {
 fn init_opentelemetry_trace(
     otlp_url: &str,
     app_name: &str,
-) -> Result<SdkTracerProvider, TraceError> {
+) -> Result<SdkTracerProvider, ExporterBuildError> {
     let exporter = SpanExporter::builder()
         .with_tonic()
         .with_endpoint(otlp_url)
@@ -120,6 +125,7 @@ pub fn init_log(log_config: &LogConfig, app_name: &str) -> Option<LogWorkGroup> 
     tracing_subscriber::registry()
         .with(env_filter())
         .with(layer)
+        .with(TimingLayer)
         .init();
     Some(
         LogWorkGroup::default()
@@ -170,6 +176,66 @@ pub fn limit_str(str: &str, limit: usize) -> String {
         string
     } else {
         str.to_owned()
+    }
+}
+
+// 自定义 Layer 用于计时
+struct TimingLayer;
+
+struct TempStatus {
+    time: Instant,
+    span_type: Option<String>,
+}
+
+impl<S> Layer<S> for TimingLayer
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
+    fn on_new_span(
+        &self,
+        attrs: &tracing::span::Attributes<'_>,
+        id: &tracing::span::Id,
+        ctx: tracing_subscriber::layer::Context<'_, S>,
+    ) {
+        let mut span_type = None;
+        attrs.record(&mut |field: &Field, value: &dyn std::fmt::Debug| {
+            if field.name() == "span_type" {
+                let _ = span_type.insert(format!("{:?}", value).replace("\"", ""));
+            }
+        });
+        if let Some(span) = ctx.span(id) {
+            span.extensions_mut().insert(TempStatus {
+                time: Instant::now(),
+                span_type,
+            })
+        };
+    }
+
+    fn on_close(&self, id: tracing::span::Id, ctx: tracing_subscriber::layer::Context<'_, S>) {
+        // 在 span 关闭时计算耗时
+        ctx.span(&id).map(|span| {
+            let tracing_id = span
+                .extensions()
+                .get::<Span>()
+                .map(|span| span.span_context().trace_id().to_string());
+            span.extensions().get::<TempStatus>().map(|temp| {
+                let duration = temp.time.elapsed().as_millis();
+                let span_name = span.name();
+                let span_type_temp = &temp.span_type;
+                let span_type = span_type_temp
+                    .as_ref()
+                    .map(|e| e.as_str())
+                    .unwrap_or("unknown");
+                let trace_id = tracing_id.as_deref().unwrap_or("unknown");
+                //unknown
+                info!(
+                    trace_id = trace_id,
+                    span_name = &span_name,
+                    span_type = &span_type,
+                    elapsed = &duration
+                )
+            })
+        });
     }
 }
 

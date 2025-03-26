@@ -3,7 +3,7 @@ use std::{collections::HashMap, time::Duration};
 use suanleme_common::{
     log::LogConfig,
     redis::{init_redis_client, RedisConfig},
-    tracing::info,
+    tracing::{info, instrument},
 };
 
 #[tokio::main]
@@ -18,6 +18,7 @@ async fn main() {
             .devmode(Some(true)),
         "suanleme-common4",
     );
+    insert_executor().await;
     let mut redis = init_redis_client(&RedisConfig {
         db: 0,
         host: "127.0.0.1:6379".to_string(),
@@ -57,4 +58,16 @@ async fn main() {
         .set_hash_xx("ds", "ewe1", "ewew7".to_string(), 9)
         .await;
     println!("{:?}", result);
+}
+
+#[instrument(
+    name = "CoinOrderMapper::insert_executor",
+    fields(
+        span_type = "DB:UPDATE",
+        db.table = "coin_orders"
+    )
+)]
+pub async fn insert_executor() {
+    tokio::time::sleep(Duration::from_secs(1)).await;
+    info!("dsds");
 }
