@@ -53,11 +53,11 @@ async fn main() {
     let result = redis
         .set_all_hash(&"ds".to_string(), &hash.iter().collect::<Vec<(_, _)>>(), 10)
         .await;
-    println!("{:?}", result);
+    println!("{result:?}");
     let result = redis
         .set_hash_xx("ds", "ewe1", "ewew7".to_string(), 9)
         .await;
-    println!("{:?}", result);
+    println!("{result:?}");
 }
 
 #[instrument(

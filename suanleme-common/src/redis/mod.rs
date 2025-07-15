@@ -245,7 +245,7 @@ impl RedisClient {
             if result.eq_ignore_ascii_case("OK") {
                 Ok(())
             } else {
-                Err(format!("set_all_hash error : {:?}", result).into())
+                Err(format!("set_all_hash error : {result:?}").into())
             }
         } else {
             let mut pip = redis::pipe();
@@ -259,7 +259,7 @@ impl RedisClient {
             if result[0] == items.len() as i32 && result[1] == 1 {
                 Ok(())
             } else {
-                Err(format!("set_all_hash error : {:?}", result).into())
+                Err(format!("set_all_hash error : {result:?}").into())
             }
         }
     }

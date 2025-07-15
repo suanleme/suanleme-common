@@ -118,7 +118,7 @@ pub fn build_check_str_v2(
     token: &str,
     data: &str,
 ) -> String {
-    format!("{}\n{}\n{}\n{}\n{}", path, version, timestamp, token, data)
+    format!("{path}\n{version}\n{timestamp}\n{token}\n{data}")
 }
 
 pub fn build_rsa_pubk_to_base64(modulus: &[u8], exponent: &[u8]) -> Result<String, BoxError> {

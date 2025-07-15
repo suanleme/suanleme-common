@@ -199,7 +199,7 @@ where
         let mut span_type = None;
         attrs.record(&mut |field: &Field, value: &dyn std::fmt::Debug| {
             if field.name() == "span_type" {
-                let _ = span_type.insert(format!("{:?}", value).replace("\"", ""));
+                let _ = span_type.insert(format!("{value:?}").replace("\"", ""));
             }
         });
         if let Some(span) = ctx.span(id) {

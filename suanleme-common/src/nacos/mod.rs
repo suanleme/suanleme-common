@@ -116,7 +116,7 @@ impl NacosConfiguration {
         sender
             .send(ident)
             .await
-            .map_err(|e| format!("get_receive_config error : {}", e))?;
+            .map_err(|e| format!("get_receive_config error : {e}"))?;
         let (config_listener, mut listener) = HotConfigChangeListener::new();
         self.config_service
             .add_listener(
@@ -141,7 +141,7 @@ impl NacosConfiguration {
         match config_response.content_type().as_str() {
             "toml" => get_toml_by_context(config_response.content()),
             "yaml" => get_yaml_by_context(config_response.content()),
-            _type => Err(format!("not support {:?}", _type).into()),
+            _type => Err(format!("not support {_type:?}").into()),
         }
     }
 

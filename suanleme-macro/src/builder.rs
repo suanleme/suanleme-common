@@ -5,7 +5,7 @@ use syn::{parse_macro_input, Data, DeriveInput};
 pub fn builder(item: TokenStream) -> TokenStream {
     let org_item = parse_macro_input!(item as DeriveInput);
     let ident = &org_item.ident;
-    let builder = syn::Ident::new(&format!("{}Builder", ident), ident.span());
+    let builder = syn::Ident::new(&format!("{ident}Builder"), ident.span());
     let Data::Struct(data_struct) = &org_item.data else {
         return syn::Error::new_spanned(org_item.to_token_stream(), "builder must label to struct")
             .into_compile_error()

@@ -20,12 +20,11 @@ pub trait HotConfig {
 }
 
 pub fn get_config_by_file<T: serde::de::DeserializeOwned>(path: &str) -> Result<T, BoxError> {
-    let contents =
-        fs::read_to_string(path).unwrap_or_else(|_| panic!("read path erro : {:?}", path));
+    let contents = fs::read_to_string(path).unwrap_or_else(|_| panic!("read path erro : {path:?}"));
     let file_type: Vec<&str> = path.split('.').collect();
     match file_type[file_type.len() - 1].as_bytes() {
         b"toml" => get_toml_by_context(&contents),
         b"yaml" => get_yaml_by_context(&contents),
-        file_type => Err(format!("not support {:?}", file_type).into()),
+        file_type => Err(format!("not support {file_type:?}").into()),
     }
 }
