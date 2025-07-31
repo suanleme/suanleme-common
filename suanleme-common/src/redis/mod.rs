@@ -82,6 +82,15 @@ impl RedisClient {
             .map_err(|e| e.to_string().into())
     }
 
+    pub async fn search_keys(&mut self, pattern: &str) -> Result<Vec<String>, BoxError> {
+        let mut keys = Vec::new();
+        let mut iter = self.connect.scan_match(pattern).await?;
+        while let Some(key) = iter.next_item().await {
+            keys.push(key);
+        }
+        Ok(keys)
+    }
+
     #[instrument(name = "redis get_str", skip(self))]
     pub async fn get_str(&mut self, key: &str) -> Result<Option<String>, RedisError> {
         self.connect.get(key).await
