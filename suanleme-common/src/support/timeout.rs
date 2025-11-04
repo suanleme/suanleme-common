@@ -57,7 +57,11 @@ impl Aspect for TimeOutAspectV2 {
         join_point: ProceedingJoinPoint,
     ) -> Result<fusen_common::FusenContext, fusen_rs::Error> {
         let start_time = get_now_date_time_as_millis();
-        let path = join_point.get_context().get_context_info().get_path();
+        let path = join_point
+            .get_context()
+            .get_context_info()
+            .get_path()
+            .clone();
         let context = if let Some(timeout) = self.timeout {
             let context = tokio::select! {
                 _ = tokio::time::sleep(timeout) => {
@@ -76,12 +80,12 @@ impl Aspect for TimeOutAspectV2 {
             };
             context
         } else {
-            info!(
-                "Path : {path:?} 耗时 : {}",
-                get_now_date_time_as_millis() - start_time
-            );
             join_point.proceed().await
         };
+        info!(
+            "Path : {path:?} 耗时 : {}",
+            get_now_date_time_as_millis() - start_time
+        );
         context
     }
 }
