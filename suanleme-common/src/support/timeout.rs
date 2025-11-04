@@ -1,12 +1,12 @@
 use bytes::Bytes;
 use fusen_rs::{
     filter::ProceedingJoinPoint,
-    fusen_common::{self, FusenContext, FusenRequest},
+    fusen_common::{self, date_util::get_now_date_time_as_millis, FusenContext, FusenRequest},
     fusen_procedural_macro::handler,
     handler::aspect::Aspect,
 };
 use std::{collections::HashMap, time::Duration};
-use tracing::error;
+use tracing::{error, info};
 
 #[allow(dead_code)]
 #[derive(Default)]
@@ -56,6 +56,8 @@ impl Aspect for TimeOutAspectV2 {
         &self,
         join_point: ProceedingJoinPoint,
     ) -> Result<fusen_common::FusenContext, fusen_rs::Error> {
+        let start_time = get_now_date_time_as_millis();
+        let path = join_point.get_context().get_context_info().get_path();
         let context = if let Some(timeout) = self.timeout {
             let context = tokio::select! {
                 _ = tokio::time::sleep(timeout) => {
@@ -74,6 +76,10 @@ impl Aspect for TimeOutAspectV2 {
             };
             context
         } else {
+            info!(
+                "Path : {path:?} 耗时 : {}",
+                get_now_date_time_as_millis() - start_time
+            );
             join_point.proceed().await
         };
         context
