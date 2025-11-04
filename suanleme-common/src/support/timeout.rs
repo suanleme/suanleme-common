@@ -44,3 +44,38 @@ impl Aspect for TimeOutAspect {
         context
     }
 }
+
+#[derive(Default)]
+pub struct TimeOutAspectV2 {
+    pub timeout: Option<Duration>,
+}
+
+#[handler(id = "TimeOutAspectV2")]
+impl Aspect for TimeOutAspectV2 {
+    async fn aroud(
+        &self,
+        join_point: ProceedingJoinPoint,
+    ) -> Result<fusen_common::FusenContext, fusen_rs::Error> {
+        let context = if let Some(timeout) = self.timeout {
+            let context = tokio::select! {
+                _ = tokio::time::sleep(timeout) => {
+                    error!("TimeOutAspectV2:time_out");
+                    let mut context = FusenContext::new(
+                    "unique_identifier".to_owned(),
+                    Default::default(),
+                    FusenRequest::new("", HashMap::new(), Bytes::new()),
+                    Default::default(),
+                );
+                *context.get_mut_response().get_mut_response_ty() = Some("String");
+                *context.get_mut_response().get_mut_response() = Err(fusen_common::error::FusenError::Info("time out".to_string()));
+                Ok(context)
+                },
+                context = join_point.proceed() => context
+            };
+            context
+        } else {
+            join_point.proceed().await
+        };
+        context
+    }
+}
