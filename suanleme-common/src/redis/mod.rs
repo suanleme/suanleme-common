@@ -265,7 +265,7 @@ impl RedisClient {
             }
             pip.atomic().add_command(cmd).expire(key, seconds);
             let result: Vec<i32> = pip.query_async(&mut self.connect).await?;
-            if result[0] == items.len() as i32 && result[1] == 1 {
+            if result[1] == 1 {
                 Ok(())
             } else {
                 Err(format!("set_all_hash error : {result:?}").into())
