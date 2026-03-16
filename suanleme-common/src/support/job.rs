@@ -21,7 +21,7 @@ pub async fn cron_job(
                 name = job_name.to_owned(),
                 trace_id = span_context.span().span_context().trace_id().to_string()
             );
-            new_span.set_parent(span_context);
+            let _ = new_span.set_parent(span_context);
             let trace_id = new_span
                 .context()
                 .span()
@@ -69,7 +69,7 @@ pub fn cron_job_v2<F, R>(
                 name = job_name.to_owned(),
                 trace_id = span_context.span().span_context().trace_id().to_string()
             );
-            new_span.set_parent(span_context);
+            let _ = new_span.set_parent(span_context);
             let trace_id = new_span
                 .context()
                 .span()
