@@ -79,3 +79,52 @@ impl Aspect for LogAspect {
         context
     }
 }
+
+#[allow(dead_code)]
+#[derive(Default)]
+pub struct LogAspectV2 {
+    trace_context_propagator: TraceContextPropagator,
+}
+
+#[handler(id = "LogAspectV2")]
+impl Aspect for LogAspectV2 {
+    async fn aroud(
+        &self,
+        mut join_point: ProceedingJoinPoint,
+    ) -> Result<fusen_common::FusenContext, fusen_rs::Error> {
+        let context = &mut join_point.get_mut_context();
+        let mut span_context = self.trace_context_propagator.extract_with_context(
+            &Span::current().context(),
+            context.get_request().get_headers(),
+        );
+        let mut first_span = None;
+        let path = context.get_context_info().get_path().get_key();
+        if !span_context.has_active_span() {
+            let span = info_span!("begin_span", path = path);
+            span_context = span.context();
+            let _ = first_span.insert(span);
+        }
+        let span = info_span!(
+            "trace_span",
+            trace_id = span_context.span().span_context().trace_id().to_string(),
+            path = path
+        );
+        let _ = span.set_parent(span_context);
+        let trace_id = span.context().span().span_context().trace_id().to_string();
+        span.set_attribute("trace_id", trace_id.to_owned());
+        if !context
+            .get_request()
+            .get_headers()
+            .contains_key("traceparent")
+        {
+            self.trace_context_propagator
+                .inject_context(&span.context(), context.get_mut_request().get_mut_headers());
+        };
+        let future = async move { join_point.proceed().await };
+        let result = tokio::spawn(future.instrument(span)).await;
+        match result {
+            Ok(context) => context,
+            Err(error) => Err(error.into()),
+        }
+    }
+}
