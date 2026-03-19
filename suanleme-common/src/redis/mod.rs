@@ -342,4 +342,28 @@ impl RedisClient {
             self.connect.incr(key, 1).await.map_err(|e| e.into())
         }
     }
+
+    const INCR_V2: &str = r#"
+        local key = KEYS[1]
+        local ttl = tonumber(ARGV[1])
+        local currentValue = redis.call("INCR", key)
+        if currentValue == 1 then
+            redis.call("EXPIRE", key, ttl)
+        end
+        return currentValue
+    "#;
+
+    #[instrument(name = "redis incr", skip(self))]
+    pub async fn incr_v2(&mut self, key: &str, seconds: i64) -> Result<i64, BoxError> {
+        if seconds >= 0 {
+            redis::Script::new(Self::INCR_V2)
+                .key(key)
+                .arg(seconds)
+                .invoke_async::<i64>(&mut self.connect)
+                .await
+                .map_err(|e| e.into())
+        } else {
+            self.connect.incr(key, 1).await.map_err(|e| e.into())
+        }
+    }
 }
