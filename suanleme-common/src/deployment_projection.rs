@@ -42,6 +42,8 @@ enum FieldKind {
     Text,
     /// ASCII decimal integer canonicalized through `i64`.
     Integer,
+    /// Strict boolean literal (`true`/`false` only); canonicalized to lower-case text.
+    Bool,
 }
 
 #[derive(Clone, Copy)]
@@ -67,6 +69,14 @@ const fn integer(name: &'static str, required: bool) -> FieldSpec {
     }
 }
 
+const fn boolean(name: &'static str, required: bool) -> FieldSpec {
+    FieldSpec {
+        name,
+        kind: FieldKind::Bool,
+        required,
+    }
+}
+
 const DETAIL_FIELDS: &[FieldSpec] = &[integer("task_id", true)];
 const SEARCH_FIELDS: &[FieldSpec] = &[
     text("merchant_mark", false),
@@ -87,6 +97,49 @@ const POINTS_COUNT_FIELDS: &[FieldSpec] = &[
     integer("task_id", true),
     text("merchant_mark", false),
 ];
+/// DistributedTraining（REQ-08 R4）：训练任务列表的真实 query 字段（与 controller 参数同名）。
+const TRAINING_SEARCH_FIELDS: &[FieldSpec] = &[
+    text("merchant_mark", false),
+    text("status", false),
+    text("sub_type", false),
+    text("schedule_status", false),
+    text("search_value", false),
+    boolean("group_task", false),
+    integer("group_id", false),
+    text("framework", false),
+    integer("page", false),
+    integer("page_size", false),
+];
+/// DistributedTraining（REQ-08 R4）：训练任务详情只按真实 task_id 绑定。
+const TRAINING_DETAIL_FIELDS: &[FieldSpec] = &[
+    integer("task_id", true),
+    text("merchant_mark", false),
+];
+/// 实例列表（R4 接入）：task 根 + 分页/状态/地域过滤。
+const POINTS_FIELDS: &[FieldSpec] = &[
+    text("merchant_mark", false),
+    integer("task_id", true),
+    integer("page", false),
+    integer("page_size", false),
+    text("status", false),
+    text("regions", false),
+];
+/// 实例日志（R4 接入）：task 根 + Pod/实例定位与容器/previous 过滤。
+const POINT_LOG_FIELDS: &[FieldSpec] = &[
+    integer("task_id", true),
+    integer("pod_id", false),
+    integer("point_id", false),
+    integer("service_id", false),
+    text("container_name", false),
+    boolean("previous", false),
+];
+/// Pod 事件（R4 接入）：Pod 根（point_id），归属经 task 继承。
+const POD_EVENT_FIELDS: &[FieldSpec] = &[integer("point_id", true)];
+/// 任务事件 v2（R4 接入）：task 根。
+const TASK_EVENT_V2_FIELDS: &[FieldSpec] = &[
+    text("merchant_mark", false),
+    integer("task_id", true),
+];
 
 fn fields_for_path(path: &str) -> Option<&'static [FieldSpec]> {
     match path {
@@ -94,6 +147,12 @@ fn fields_for_path(path: &str) -> Option<&'static [FieldSpec]> {
         "/api/deployment/task/search" | "/api/task/deployment/search" => Some(SEARCH_FIELDS),
         "/api/deployment/task/get_replicas_record" => Some(REPLICAS_RECORD_FIELDS),
         "/api/deployment/task/points_count" => Some(POINTS_COUNT_FIELDS),
+        "/api/task/distributed-training/search" => Some(TRAINING_SEARCH_FIELDS),
+        "/api/task/distributed-training/detail" => Some(TRAINING_DETAIL_FIELDS),
+        "/api/deployment/task/points" => Some(POINTS_FIELDS),
+        "/api/deployment/task/point_log" => Some(POINT_LOG_FIELDS),
+        "/api/deployment/task/pod_event" => Some(POD_EVENT_FIELDS),
+        "/api/deployment/task/task_event_v2" => Some(TASK_EVENT_V2_FIELDS),
         _ => None,
     }
 }
@@ -140,10 +199,19 @@ pub fn business_query_projection(
                 raw.clone()
             }
             FieldKind::Integer => canonical_integer(raw)?,
+            FieldKind::Bool => canonical_bool(raw)?,
         };
         projected.insert(spec.name.to_string(), Value::String(rendered));
     }
     Ok(Value::Object(projected))
+}
+
+fn canonical_bool(raw: &str) -> Result<String, &'static str> {
+    match raw {
+        "true" => Ok("true".to_owned()),
+        "false" => Ok("false".to_owned()),
+        _ => Err("invalid_business_parameter"),
+    }
 }
 
 fn canonical_integer(raw: &str) -> Result<String, &'static str> {
@@ -330,6 +398,52 @@ mod tests {
                 "{route}"
             );
         }
+    }
+
+    #[test]
+    fn distributed_training_routes_project_their_real_query_fields() {
+        assert_eq!(
+            business_query_projection(
+                "GET /api/task/distributed-training/detail",
+                &params(&[("task_id", "007")])
+            )
+            .unwrap(),
+            json!({"task_id":"7"})
+        );
+        assert_eq!(
+            business_query_projection(
+                "GET /api/task/distributed-training/search",
+                &params(&[
+                    ("status", "Running"),
+                    ("group_task", "true"),
+                    ("group_id", "42"),
+                    ("framework", "PyTorch"),
+                    ("page", "1"),
+                    ("page_size", "20"),
+                ])
+            )
+            .unwrap(),
+            json!({
+                "status":"Running","group_task":"true","group_id":"42",
+                "framework":"PyTorch","page":"1","page_size":"20"
+            })
+        );
+        // 布尔只接受严格 true/false（与框架查询参数解析一致），不做宽松转换。
+        assert_eq!(
+            business_query_projection(
+                "GET /api/task/distributed-training/search",
+                &params(&[("group_task", "True")])
+            ),
+            Err("invalid_business_parameter")
+        );
+        // 未知字段仍然 fail-closed（不得静默忽略进摘要）。
+        assert_eq!(
+            business_query_projection(
+                "GET /api/task/distributed-training/search",
+                &params(&[("project_id", "16")])
+            ),
+            Err("unknown_business_parameter")
+        );
     }
 
     #[test]
