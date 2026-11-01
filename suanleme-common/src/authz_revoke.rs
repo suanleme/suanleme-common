@@ -9,7 +9,7 @@
 //! （`gj-iam-center/src/service/authorization.rs::delete_located_in_tx`）。
 //!
 //! 为避免 UC 另写第二套撤权规则，把**对两侧都必须是同一形状**的部分收敛到这里：
-//! 锁 key 构造、锁 SQL、候选行/行锁/策略快照/撤单 SQL、撤销审计 JSON 快照、审计动作常量、
+//! 锁 key 构造、锁 SQL、候选行/行锁/策略快照/策略关联清理与撤单 SQL、撤销审计 JSON 快照、审计动作常量、
 //! 以及锁序说明。本模块**不依赖 sqlx**（只有 `serde_json`），由各服务用自己的连接执行。
 //!
 //! ## 锁序（与 IAM `delete_located_in_tx` / UC 成员写方逐项一致）
@@ -125,13 +125,18 @@ pub const AUTHZ_ROW_FOR_UPDATE_SQL: &str =
       where a.tenant_id = $1 and a.id = $2 \
       for update of a";
 
-/// 撤销前快照该单策略 id（升序；`authorization_policy` 由 FK `on delete cascade` 连带清理）。
+/// 撤销前快照该单策略 id（升序；清理关联前必须先取）。
 pub const AUTHZ_POLICY_IDS_SQL: &str =
     "select policy_id from authorization_policy where authorization_id = $1 order by policy_id";
 
+/// 撤销整单前显式删除策略关联（参数：`authorization_id`）。
+pub const DELETE_AUTHZ_POLICY_LINKS_SQL: &str =
+    "delete from authorization_policy where authorization_id = $1";
+
 /// 撤销整单（参数：`authorization_id`）——与 IAM `iam::delete_authorization` 同一语句。
 ///
-/// `authorization_policy` 由 FK `on delete cascade` 清理；不做两段手工删。
+/// 调用方须在同一事务内先执行 [`DELETE_AUTHZ_POLICY_LINKS_SQL`]，再执行本语句；返回语义仍以
+/// 本语句的 `rows_affected` 为准。
 pub const DELETE_AUTHZ_SQL: &str = "delete from authz where id = $1";
 
 /// 授权身份锁 key（与 IAM `iam::lock_authorization_identity` **逐字一致**）。
@@ -242,6 +247,10 @@ mod tests {
     /// 撤销 SQL 与 IAM `iam::delete_authorization` / `iam::authz_policy_ids` 同一语句。
     #[test]
     fn revoke_sql_matches_iam_delete_core() {
+        assert_eq!(
+            DELETE_AUTHZ_POLICY_LINKS_SQL,
+            "delete from authorization_policy where authorization_id = $1"
+        );
         assert_eq!(DELETE_AUTHZ_SQL, "delete from authz where id = $1");
         assert_eq!(
             AUTHZ_POLICY_IDS_SQL,
