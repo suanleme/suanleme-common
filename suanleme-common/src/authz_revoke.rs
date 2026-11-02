@@ -3,29 +3,37 @@
 //! ## 为什么放在 `suanleme-common`
 //!
 //! UC 与 IAM 部署在**同一个权威身份库**（unified identity：`authz` / `authorization_policy` /
-//! `policy` / `audit_change` 与 `tenant` / `tenant_user` / `tenant_member_instance` / `user_group`
+//! `policy` / `audit_change` 与 `tenant` / `tenant_user` / `user_group`
 //! 同库）。REQ-14 要求成员移出、用户组删除在 **UC 自己的业务事务内**直接完成撤销与审计，
 //! 不允许跨服务 RPC 声称共享事务；IAM 已有唯一删除写核心
 //! （`gj-iam-center/src/service/authorization.rs::delete_located_in_tx`）。
 //!
-//! 为避免 UC 另写第二套撤权规则，把**对两侧都必须是同一形状**的部分收敛到这里：
-//! 锁 key 构造、锁 SQL、候选行/行锁/策略快照/策略关联清理与撤单 SQL、撤销审计 JSON 快照、审计动作常量、
+//! 为避免 UC 另写第二套撤权规则，把两侧需要复用的 SQL 与值对象收敛到这里：锁 key 构造、
+//! 候选行/授权行锁/策略快照/策略关联清理与撤单 SQL、撤销审计 JSON 快照、审计动作常量，
 //! 以及锁序说明。本模块**不依赖 sqlx**（只有 `serde_json`），由各服务用自己的连接执行。
+//!
+//! 共享常量不表示两个服务必须重复执行每一步：IAM 的独立撤权入口用
+//! [`TENANT_LOCK_SQL`] / [`SUBJECT_LIFECYCLE_USER_SQL`] / [`SUBJECT_LIFECYCLE_GROUP_SQL`]
+//! 取得前置锁；UC 的成员/组写事务在进入撤权执行器前已经持有同一主体行锁，必须直接消费锁内 id，
+//! **不得再次查询或加锁主体行**。
 //!
 //! ## 锁序（与 IAM `delete_located_in_tx` / UC 成员写方逐项一致）
 //!
 //! ```text
-//! tenant 行（IAM 撤权 FOR SHARE；UC 成员/组写事务已先取 FOR UPDATE，更强且顺序相同）
-//!   → 主体生命周期行（user ⇒ tenant_member_instance 周期行 FOR UPDATE；
+//! tenant 行（IAM 在撤权入口获取；UC 成员/组写事务已持有）
+//!   → 主体生命周期行（user ⇒ tenant_user 当前成员行 FOR UPDATE；
 //!                     user_group ⇒ user_group 行 FOR UPDATE）
 //!   → pg_advisory_xact_lock('iam-authz:{tenant}:{subject_type}:{binding_id}:{scope_or_0}')
 //!   → authz 行 FOR UPDATE
 //! ```
 //!
+//! 这是整条事务的全局顺序，不是要求 UC 在已持锁后再执行一次前两步。UC 撤权执行器从 advisory
+//! 身份锁开始；IAM 独立撤权入口才使用本模块的 tenant / subject 锁 SQL。
+//!
 //! 主体绑定 id（`binding_id`）是**真实绑定列**：user ⇒ `subject_tenant_user_id`
-//! （成员**周期** id，不是平台 user_id）；user_group ⇒ `subject_user_group_id`。
+//! （`tenant_user.id`，即成员实例 id，不是平台 user_id）；user_group ⇒ `subject_user_group_id`。
 //! 逐单撤销时按 `authz.id` **升序**取 advisory/行锁（与 IAM 单行路径无反向环；
-//! 同主体并发写由组/周期行锁串行化）。
+//! 同主体并发写由组/成员行锁串行化）。
 //!
 //! ## 审计形状（`audit_change`，与 IAM `datasource/mapper/audit_change.rs::authz_state` 逐字一致）
 //!
@@ -35,9 +43,9 @@
 //! `scope_resource_group_id = 该单 scope`、`before_json = authz_state(Some(id), …, 撤销前 policy_ids)`、
 //! `after_json = authz_state(None, …, [])`、`source = api`。
 //!
-//! **`subject_id` 语义刻意与 IAM 现有行保持一致**（user 主体是平台 user_id，不是成员周期 id）：
+//! **`subject_id` 语义刻意与 IAM 现有行保持一致**（user 主体是平台 user_id，不是成员实例 id）：
 //! 同一 `action+target_type` 的审计行必须只有一种主体语义，否则两表/两服务合并出的变更史不可读。
-//! 成员**周期 id** 由撤销方写进 `detail` 文本（UC 级联），不改 JSON 形状、不偷换旧列含义
+//! 成员实例 id 由撤销方写进 `detail` 文本（UC 级联），不改 JSON 形状、不偷换旧列含义
 //! （data-model §3.6 / §5 的口径）。
 //!
 //! **版本**：本模块随第一次使用者（REQ-14 RID `req14-e16660ef`）落地；未发布 registry，
@@ -58,29 +66,31 @@ pub const SUBJECT_USER: &str = "user";
 pub const SUBJECT_USER_GROUP: &str = "user_group";
 
 /// 锁序的唯一文字口径（日志/报告/测试引用；不参与 SQL）。
-pub const LOCK_ORDER: &str = "tenant -> subject lifecycle row (tenant_member_instance|user_group FOR UPDATE) -> pg_advisory_xact_lock(iam-authz identity) -> authz row FOR UPDATE";
+pub const LOCK_ORDER: &str = "tenant -> subject lifecycle row (tenant_user|user_group FOR UPDATE) -> pg_advisory_xact_lock(iam-authz identity) -> authz row FOR UPDATE";
 
-/// 租户行锁（IAM 撤权核心的 `lock_authorization_tenant` 同一 SQL）。
+/// IAM 独立撤权入口的租户行锁（`lock_authorization_tenant` 同一 SQL）。
 ///
-/// UC 的成员/组写事务通常已先对 tenant 取更强的 `FOR UPDATE`；同一事务内再取 `FOR SHARE`
-/// 不会反向（PostgreSQL 行锁强度只升不降），锁序仍然成立。
+/// UC 成员/组写事务进入撤权执行器前已经持有 tenant 行锁，不得再次执行本 SQL。
 pub const TENANT_LOCK_SQL: &str = "select id from tenant where id = $1 for share";
 
 /// 事务级 advisory 身份锁 SQL（参数为 [`identity_lock_key`] 构造的 key）。
 pub const IDENTITY_LOCK_SQL: &str = "select pg_advisory_xact_lock(hashtext($1)::bigint)";
 
-/// user 主体的生命周期行锁：`tenant_member_instance` 的**周期行**（含已结束周期）。
+/// IAM 独立撤权入口的 user 主体生命周期行锁：`tenant_user` 当前成员行。
 ///
-/// 与 IAM `lock_current_tenant_user`（写准入）/`lock_authorization_subject_lifecycle`（删除）
-/// 使用同一物理行；不锁 `tenant_user` 行（原成员行退出即删，反向锁会与 UC 成环）。
+/// UC 成员移出事务已按 id 升序持有这些行锁，必须直接消费锁内 id，不得再次执行本 SQL。
 pub const SUBJECT_LIFECYCLE_USER_SQL: &str =
-    "select id from tenant_member_instance where tenant_id = $1 and id = $2 for update";
+    "select id from tenant_user where tenant_id = $1 and id = $2 for update";
 
-/// user_group 主体的生命周期行锁：`user_group` 行（不看状态，停用组授权仍可撤销）。
+/// IAM 独立撤权入口的 user_group 主体生命周期行锁（不看状态，停用组授权仍可撤销）。
+/// UC 组删除事务已经持有该行锁，不得再次执行本 SQL。
 pub const SUBJECT_LIFECYCLE_GROUP_SQL: &str =
     "select id from user_group where tenant_id = $1 and id = $2 for update";
 
-/// 取主体生命周期行锁 SQL（按 `subject_type` 选 statement；与 IAM 同一对 SQL）。
+/// Select the lifecycle lock used by an independent IAM revocation entry.
+///
+/// Kept as a source-compatible helper for existing consumers. UC writers that already hold the
+/// tenant and subject row locks must not call it again; they enter at [`IDENTITY_LOCK_SQL`].
 pub fn subject_lifecycle_lock_sql(subject_type: &str) -> &'static str {
     match subject_type {
         SUBJECT_USER_GROUP => SUBJECT_LIFECYCLE_GROUP_SQL,
@@ -88,17 +98,17 @@ pub fn subject_lifecycle_lock_sql(subject_type: &str) -> &'static str {
     }
 }
 
-/// 成员移出候选授权单（**任何 status**，只按**成员周期 id**，绝不按平台 user_id 扫）。
+/// 成员移出候选授权单（**任何 status**，只按**成员实例 id**，绝不按平台 user_id 扫）。
 ///
-/// 返回 `(authorization_id, scope, subject_id=平台 user_id, binding_id=周期 id)`；
+/// 返回 `(authorization_id, scope, subject_id=平台 user_id, binding_id=成员实例 id)`；
 /// `order by a.id` 是后续逐单加锁的稳定顺序。平台 user_id 只用于审计快照（`subject_id` 口径），
 /// 不参与筛选谓词；`binding_id` 是 advisory 身份锁/行锁复查用的真实绑定列。
 pub const AUTHZ_IDS_BY_MEMBER_INSTANCES_SQL: &str = "select a.id, a.scope_resource_group_id, \
-            tmi.user_id as subject_id, a.subject_tenant_user_id as binding_id \
+            tu.user_id as subject_id, a.subject_tenant_user_id as binding_id \
        from authz a \
-       join tenant_member_instance tmi \
-         on tmi.tenant_id = a.tenant_id \
-        and tmi.id = a.subject_tenant_user_id \
+       join tenant_user tu \
+         on tu.tenant_id = a.tenant_id \
+        and tu.id = a.subject_tenant_user_id \
       where a.tenant_id = $1 \
         and a.subject_type = 'user' \
         and a.subject_tenant_user_id = any($2) \
@@ -141,7 +151,7 @@ pub const DELETE_AUTHZ_SQL: &str = "delete from authz where id = $1";
 
 /// 授权身份锁 key（与 IAM `iam::lock_authorization_identity` **逐字一致**）。
 ///
-/// `subject_binding_id` = 真实绑定行 id：user ⇒ 成员**周期** id；user_group ⇒ 组 id。
+/// `subject_binding_id` = 真实绑定行 id：user ⇒ `tenant_user.id`（成员实例 id）；user_group ⇒ 组 id。
 /// 全局 scope 用 `0` 占位（`scope.unwrap_or(0)`），与 IAM 相同。
 pub fn identity_lock_key(
     tenant_id: i64,
@@ -161,7 +171,7 @@ pub fn identity_lock_key(
 /// - `authorization_id = None` 表示该时刻该单不存在（撤销整单的 `after_json`）；
 /// - `policy_ids` 统一升序输出；
 /// - `subject_id` 是该主体的对外 id（user ⇒ 平台 user_id；user_group ⇒ 组 id），
-///   **不是**成员周期 id（周期 id 见 [`AUTHZ_IDS_BY_MEMBER_INSTANCES_SQL`] 注释与撤销方 `detail`）。
+///   **不是**成员实例 id（实例 id 见 [`AUTHZ_IDS_BY_MEMBER_INSTANCES_SQL`] 注释与撤销方 `detail`）。
 pub fn authz_state(
     authorization_id: Option<i64>,
     subject_type: &str,
@@ -209,17 +219,61 @@ mod tests {
         );
     }
 
-    /// 主体生命周期锁 SQL：user 锁周期行、group 锁组行（与 IAM 同一对语句的语义）。
+    /// IAM 独立撤权入口的主体生命周期锁 SQL：user 锁当前成员行、group 锁组行。
     #[test]
-    fn subject_lifecycle_lock_sql_selects_binding_row() {
-        assert!(subject_lifecycle_lock_sql("user").contains("tenant_member_instance"));
-        assert!(subject_lifecycle_lock_sql("user").contains("for update"));
-        assert!(subject_lifecycle_lock_sql("user_group").contains("user_group"));
-        assert!(subject_lifecycle_lock_sql("user_group").contains("for update"));
-        // 未知类型按 user 分支（与 IAM `match "user_group" => … _ => user` 的默认分支一致）。
+    fn iam_subject_lifecycle_sql_locks_binding_row() {
+        assert!(SUBJECT_LIFECYCLE_USER_SQL.contains("tenant_user"));
+        assert!(SUBJECT_LIFECYCLE_USER_SQL.contains("for update"));
+        assert!(SUBJECT_LIFECYCLE_GROUP_SQL.contains("user_group"));
+        assert!(SUBJECT_LIFECYCLE_GROUP_SQL.contains("for update"));
+        assert_eq!(subject_lifecycle_lock_sql("user"), SUBJECT_LIFECYCLE_USER_SQL);
         assert_eq!(
-            subject_lifecycle_lock_sql("other"),
-            SUBJECT_LIFECYCLE_USER_SQL
+            subject_lifecycle_lock_sql("user_group"),
+            SUBJECT_LIFECYCLE_GROUP_SQL
+        );
+    }
+
+    /// UC 调用方已经持有 tenant/subject 行锁；撤权执行器不得再调用 IAM 的前置锁 SQL。
+    #[test]
+    fn uc_revoke_executor_does_not_relock_already_locked_subject() {
+        use std::path::PathBuf;
+
+        let source_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../gj-user-center/gj-user-center/src/datasource/mapper/authz_revoke.rs");
+        let Ok(source) = std::fs::read_to_string(&source_path) else {
+            eprintln!(
+                "SKIP uc_revoke_executor_does_not_relock_already_locked_subject: UC source absent ({})",
+                source_path.display()
+            );
+            return;
+        };
+        let member_start = source
+            .find("pub async fn revoke_member_direct_authorizations(")
+            .expect("UC member revoke executor must exist");
+        let group_start = source
+            .find("pub async fn revoke_user_group_authorizations(")
+            .expect("UC group revoke executor must exist");
+        let revoke_one_start = source
+            .find("async fn revoke_one_locked(")
+            .expect("UC per-authorization revoke core must exist");
+        assert!(member_start < group_start && group_start < revoke_one_start);
+
+        let executor_source = &source[member_start..revoke_one_start];
+        for forbidden in [
+            "TENANT_LOCK_SQL",
+            "SUBJECT_LIFECYCLE_USER_SQL",
+            "SUBJECT_LIFECYCLE_GROUP_SQL",
+            "subject_lifecycle_lock_sql",
+        ] {
+            assert!(
+                !executor_source.contains(forbidden),
+                "UC 已持有 tenant/subject 行锁，撤权执行器不得再次调用 `{forbidden}`"
+            );
+        }
+        assert!(
+            executor_source.contains("AUTHZ_IDS_BY_MEMBER_INSTANCES_SQL")
+                && executor_source.contains("AUTHZ_IDS_BY_USER_GROUP_SQL"),
+            "UC 撤权执行器应直接从锁内 binding id 进入授权候选查询"
         );
     }
 

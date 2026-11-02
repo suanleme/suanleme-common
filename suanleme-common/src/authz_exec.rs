@@ -21,7 +21,9 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
-use crate::authz::{Clause, ClauseScope, Id, RequestAction, RequestSubject, ResourcePattern, SelectedScope};
+use crate::authz::{
+    Clause, ClauseScope, Id, RequestAction, RequestSubject, ResourcePattern, SelectedScope,
+};
 use crate::authz_transition::TransitionQueryConstraint;
 
 /// 共享执行辅助的失败原因（结构化、具名；不含 SQL/存在性细节）。
@@ -108,10 +110,11 @@ pub struct SourceDeadline {
 
 impl SourceDeadline {
     /// 从真实源起止构造；起止倒置/负数即拒绝（不修正、不放宽）。
-    pub fn new(source_started_at_unix_ms: i64, source_expires_at_unix_ms: i64) -> Result<Self, ExecError> {
-        if source_started_at_unix_ms < 0
-            || source_expires_at_unix_ms <= source_started_at_unix_ms
-        {
+    pub fn new(
+        source_started_at_unix_ms: i64,
+        source_expires_at_unix_ms: i64,
+    ) -> Result<Self, ExecError> {
+        if source_started_at_unix_ms < 0 || source_expires_at_unix_ms <= source_started_at_unix_ms {
             return Err(ExecError::QueryConstraintInvalid);
         }
         Ok(Self {
@@ -229,7 +232,10 @@ pub fn compile_query_filter(
     };
     let selected = compiler.selected_scope(&constraint.selected_scope)?;
     // 完整性闸：没有事实位的表不得把 NULL 当无项目；有事实位但未确认的 NULL 是归属未知。
-    let completeness = match (options.null_confirmed_ungrouped, columns.ownership_confirmed) {
+    let completeness = match (
+        options.null_confirmed_ungrouped,
+        columns.ownership_confirmed,
+    ) {
         (true, _) => format!(
             "({prefix}{group} > 0 OR {prefix}{group} IS NULL)",
             prefix = compiler.prefix,
@@ -555,7 +561,12 @@ mod tests {
     #[test]
     fn permit_keeps_the_original_source_deadline_and_never_extends_it() {
         let permit = compile_query_permit(
-            &constraint(project(16), vec![clause_any(ClauseScope::All)], vec![], false),
+            &constraint(
+                project(16),
+                vec![clause_any(ClauseScope::All)],
+                vec![],
+                false,
+            ),
             COLUMNS,
             &options(1, ""),
         )
@@ -571,13 +582,15 @@ mod tests {
         );
         // 墙钟回退不延长：回退到更早时间也不改变原始截止。
         assert!(permit.ensure_live(1_799_999_999_000).is_ok());
-        assert_eq!(
-            permit.deadline.source_expires_at_unix_ms,
-            1_800_000_060_000
-        );
+        assert_eq!(permit.deadline.source_expires_at_unix_ms, 1_800_000_060_000);
         // 该 permit 是从约束原样复制的截止；再次编译同一约束不会把截止推后。
         let again = compile_query_permit(
-            &constraint(project(16), vec![clause_any(ClauseScope::All)], vec![], false),
+            &constraint(
+                project(16),
+                vec![clause_any(ClauseScope::All)],
+                vec![],
+                false,
+            ),
             COLUMNS,
             &options(1, ""),
         )
@@ -638,15 +651,25 @@ mod tests {
         let identity = EnvelopeIdentity::from_parts(Some(4), Some(7), Some("team")).unwrap();
         assert!(check_subject(&identity, &subject).is_ok());
         assert_eq!(
-            check_subject(&identity, &serde_json::from_value(json!({
-                "tenant_id": "5", "user_id": "7", "tenant_type": "team"
-            })).unwrap()).unwrap_err(),
+            check_subject(
+                &identity,
+                &serde_json::from_value(json!({
+                    "tenant_id": "5", "user_id": "7", "tenant_type": "team"
+                }))
+                .unwrap()
+            )
+            .unwrap_err(),
             ExecError::SubjectMismatch
         );
         assert_eq!(
-            check_subject(&identity, &serde_json::from_value(json!({
-                "tenant_id": "4", "user_id": "8", "tenant_type": "team"
-            })).unwrap()).unwrap_err(),
+            check_subject(
+                &identity,
+                &serde_json::from_value(json!({
+                    "tenant_id": "4", "user_id": "8", "tenant_type": "team"
+                }))
+                .unwrap()
+            )
+            .unwrap_err(),
             ExecError::SubjectMismatch
         );
         assert!(EnvelopeIdentity::from_parts(Some(0), None, None).is_none());

@@ -81,8 +81,7 @@ fn append_canonical(value: &Value, output: &mut String) -> Result<(), &'static s
         Value::Bool(flag) => output.push_str(if *flag { "true" } else { "false" }),
         Value::Number(number) => append_canonical_number(number, output)?,
         Value::String(text) => {
-            let escaped =
-                serde_json::to_string(text).map_err(|_| "digest_unsupported_string")?;
+            let escaped = serde_json::to_string(text).map_err(|_| "digest_unsupported_string")?;
             output.push_str(&escaped);
         }
         Value::Array(items) => {
@@ -115,9 +114,12 @@ fn append_canonical(value: &Value, output: &mut String) -> Result<(), &'static s
     Ok(())
 }
 
-fn append_canonical_number(number: &serde_json::Number, output: &mut String) -> Result<(), &'static str> {
+fn append_canonical_number(
+    number: &serde_json::Number,
+    output: &mut String,
+) -> Result<(), &'static str> {
     if let Some(value) = number.as_i64() {
-        if value < -MAX_SAFE_INTEGER || value > MAX_SAFE_INTEGER {
+        if !(-MAX_SAFE_INTEGER..=MAX_SAFE_INTEGER).contains(&value) {
             return Err(DIGEST_UNSUPPORTED_NUMBER);
         }
         output.push_str(&value.to_string());
@@ -282,7 +284,9 @@ mod tests {
         for input in [b"".as_slice(), b"a", b"hello world"] {
             let hex = sha256_hex(input);
             assert_eq!(hex.len(), 64);
-            assert!(hex.bytes().all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
+            assert!(hex
+                .bytes()
+                .all(|byte| byte.is_ascii_digit() || (b'a'..=b'f').contains(&byte)));
         }
     }
 
@@ -341,7 +345,10 @@ mod tests {
             json!(9_007_199_254_740_991_i64),
             json!(-9_007_199_254_740_991_i64),
         ] {
-            assert!(canonical_json(&json!({"n": supported})).is_ok(), "{supported}");
+            assert!(
+                canonical_json(&json!({"n": supported})).is_ok(),
+                "{supported}"
+            );
         }
         assert_eq!(canonical_json(&json!({"n": 0})).unwrap(), r#"{"n":0}"#);
         // A digest never rounds an unsupported nested number into a string or float.
@@ -378,12 +385,15 @@ mod tests {
         let created = new_root_target(&key, "primary");
         assert_eq!(target_key_of(&existing), target_key_of(&created));
         // Same role and root but different object payload still maps to the same key.
+        assert_eq!(target_key_of(&target(&key, "primary", "999")), key.as_str());
         assert_eq!(
-            target_key_of(&target(&key, "primary", "999")),
-            key.as_str()
+            target_key("", "task", "1", "primary"),
+            Err("target_identity_empty")
         );
-        assert_eq!(target_key("", "task", "1", "primary"), Err("target_identity_empty"));
-        assert_eq!(target_key("deployment", " ", "1", "primary"), Err("target_identity_empty"));
+        assert_eq!(
+            target_key("deployment", " ", "1", "primary"),
+            Err("target_identity_empty")
+        );
     }
 
     #[test]
@@ -412,18 +422,36 @@ mod tests {
         // Every bound component changes the digest.
         assert_ne!(
             base,
-            request_digest("gj-storage-api", &subject(), &action("/api/deployment/task/detail"), &business).unwrap()
+            request_digest(
+                "gj-storage-api",
+                &subject(),
+                &action("/api/deployment/task/detail"),
+                &business
+            )
+            .unwrap()
         );
         let other_subject: RequestSubject =
             serde_json::from_value(json!({"tenant_id":"4","user_id":"8","tenant_type":"team"}))
                 .unwrap();
         assert_ne!(
             base,
-            request_digest("gj-deployment-api", &other_subject, &action("/api/deployment/task/detail"), &business).unwrap()
+            request_digest(
+                "gj-deployment-api",
+                &other_subject,
+                &action("/api/deployment/task/detail"),
+                &business
+            )
+            .unwrap()
         );
         assert_ne!(
             base,
-            request_digest("gj-deployment-api", &subject(), &action("/api/deployment/task/search"), &business).unwrap()
+            request_digest(
+                "gj-deployment-api",
+                &subject(),
+                &action("/api/deployment/task/search"),
+                &business
+            )
+            .unwrap()
         );
         assert_ne!(
             base,
@@ -454,8 +482,11 @@ mod tests {
         assert_ne!(one, targets_digest(&[first.clone()]).unwrap());
         assert_ne!(
             one,
-            targets_digest(&[first.clone(), target("c".repeat(64).as_str(), "secondary", "456")])
-                .unwrap()
+            targets_digest(&[
+                first.clone(),
+                target("c".repeat(64).as_str(), "secondary", "456")
+            ])
+            .unwrap()
         );
         assert!(targets_digest(&[]).is_ok());
         // Duplicate identical targets are preserved (not silently deduplicated) but the

@@ -403,7 +403,10 @@ mod tests {
             ("epoch", json!("22222222-2222-4222-8222-222222222222")),
             ("cache_protocol", json!(2)),
             ("version", json!({"cache_protocol":2})),
-            ("lease", json!({"source_started_at_unix_ms":1,"source_expires_at_unix_ms":2})),
+            (
+                "lease",
+                json!({"source_started_at_unix_ms":1,"source_expires_at_unix_ms":2}),
+            ),
             ("scope_all", json!(true)),
         ] {
             let mut candidate = context_json();
@@ -457,7 +460,10 @@ mod tests {
             "source_expires_at_unix_ms",
         ] {
             let mut candidate = context_json();
-            candidate["auth_state"].as_object_mut().unwrap().remove(field);
+            candidate["auth_state"]
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
             assert!(
                 serde_json::from_value::<TransitionExecutionContext>(candidate).is_err(),
                 "missing auth_state.{field}"
@@ -490,13 +496,7 @@ mod tests {
         let boundary = TransitionAuthState::new(0, 0, 7, 7).unwrap();
         assert!(boundary.is_expired(7));
         assert!(TransitionAuthState::new(0, 0, 8, 7).is_err());
-        assert!(TransitionAuthState::new(
-            0,
-            0,
-            0,
-            MAX_SAFE_INTEGER
-        )
-        .is_ok());
+        assert!(TransitionAuthState::new(0, 0, 0, MAX_SAFE_INTEGER).is_ok());
     }
 
     #[test]
@@ -516,7 +516,13 @@ mod tests {
         assert!(!parsed.public_bypass);
         assert!(parsed.allow_clauses.is_empty());
         assert_eq!(serde_json::to_value(&parsed).unwrap(), value);
-        for field in ["selected_scope", "public_bypass", "allow_clauses", "deny_clauses", "auth_state"] {
+        for field in [
+            "selected_scope",
+            "public_bypass",
+            "allow_clauses",
+            "deny_clauses",
+            "auth_state",
+        ] {
             let mut candidate = value.clone();
             candidate.as_object_mut().unwrap().remove(field);
             assert!(
@@ -526,7 +532,10 @@ mod tests {
         }
         for (field, payload) in [
             ("version", json!({"cache_protocol":2})),
-            ("lease", json!({"source_started_at_unix_ms":1,"source_expires_at_unix_ms":2})),
+            (
+                "lease",
+                json!({"source_started_at_unix_ms":1,"source_expires_at_unix_ms":2}),
+            ),
             ("epoch", json!("22222222-2222-4222-8222-222222222222")),
         ] {
             let mut candidate = value.clone();
@@ -553,8 +562,7 @@ mod tests {
                 "{pointer}"
             );
         }
-        let context: TransitionExecutionContext =
-            serde_json::from_value(context_json()).unwrap();
+        let context: TransitionExecutionContext = serde_json::from_value(context_json()).unwrap();
         assert_eq!(context.protocol, TRANSITION_PROTOCOL);
         assert!(context.query_constraint.is_none());
         let expires = context.auth_state.source_expires_at_unix_ms;

@@ -93,10 +93,7 @@ const REPLICAS_RECORD_FIELDS: &[FieldSpec] = &[
     integer("page", false),
     integer("page_size", false),
 ];
-const POINTS_COUNT_FIELDS: &[FieldSpec] = &[
-    integer("task_id", true),
-    text("merchant_mark", false),
-];
+const POINTS_COUNT_FIELDS: &[FieldSpec] = &[integer("task_id", true), text("merchant_mark", false)];
 /// DistributedTraining（REQ-08 R4）：训练任务列表的真实 query 字段（与 controller 参数同名）。
 const TRAINING_SEARCH_FIELDS: &[FieldSpec] = &[
     text("merchant_mark", false),
@@ -111,10 +108,8 @@ const TRAINING_SEARCH_FIELDS: &[FieldSpec] = &[
     integer("page_size", false),
 ];
 /// DistributedTraining（REQ-08 R4）：训练任务详情只按真实 task_id 绑定。
-const TRAINING_DETAIL_FIELDS: &[FieldSpec] = &[
-    integer("task_id", true),
-    text("merchant_mark", false),
-];
+const TRAINING_DETAIL_FIELDS: &[FieldSpec] =
+    &[integer("task_id", true), text("merchant_mark", false)];
 /// 实例列表（R4 接入）：task 根 + 分页/状态/地域过滤。
 const POINTS_FIELDS: &[FieldSpec] = &[
     text("merchant_mark", false),
@@ -136,10 +131,8 @@ const POINT_LOG_FIELDS: &[FieldSpec] = &[
 /// Pod 事件（R4 接入）：Pod 根（point_id），归属经 task 继承。
 const POD_EVENT_FIELDS: &[FieldSpec] = &[integer("point_id", true)];
 /// 任务事件 v2（R4 接入）：task 根。
-const TASK_EVENT_V2_FIELDS: &[FieldSpec] = &[
-    text("merchant_mark", false),
-    integer("task_id", true),
-];
+const TASK_EVENT_V2_FIELDS: &[FieldSpec] =
+    &[text("merchant_mark", false), integer("task_id", true)];
 
 fn fields_for_path(path: &str) -> Option<&'static [FieldSpec]> {
     match path {
@@ -275,15 +268,13 @@ mod tests {
             "GET /api/deployment/task/search",
             "GET /api/task/deployment/search",
         ] {
-            assert_eq!(
-                business_query_projection(route, &input).unwrap(),
-                expected
-            );
+            assert_eq!(business_query_projection(route, &input).unwrap(), expected);
         }
         // Query object key order is canonical (serde_json Map = BTreeMap).
-        let rendered =
-            serde_json::to_string(&business_query_projection("GET /api/deployment/task/search", &input).unwrap())
-                .unwrap();
+        let rendered = serde_json::to_string(
+            &business_query_projection("GET /api/deployment/task/search", &input).unwrap(),
+        )
+        .unwrap();
         assert_eq!(
             rendered,
             r#"{"merchant_mark":"gj-team","page":"2","page_size":"20","search_value":"  name with space  ","status":"RUNNING","type":"normal"}"#
@@ -353,7 +344,15 @@ mod tests {
     fn invalid_and_duplicate_values_are_rejected() {
         let detail = "GET /api/deployment/task/detail";
         for value in [
-            "", " 123", "123 ", "-1", "+1", "1.0", "1e3", "abc", "9223372036854775808",
+            "",
+            " 123",
+            "123 ",
+            "-1",
+            "+1",
+            "1.0",
+            "1e3",
+            "abc",
+            "9223372036854775808",
         ] {
             assert_eq!(
                 business_query_projection(detail, &params(&[("task_id", value)])),
@@ -448,9 +447,11 @@ mod tests {
 
     #[test]
     fn projection_values_are_strings_not_numbers() {
-        let value =
-            business_query_projection("GET /api/deployment/task/detail", &params(&[("task_id", "7")]))
-                .unwrap();
+        let value = business_query_projection(
+            "GET /api/deployment/task/detail",
+            &params(&[("task_id", "7")]),
+        )
+        .unwrap();
         assert!(value.get("task_id").unwrap().is_string());
         assert!(!value.get("task_id").unwrap().is_number());
         // Text values keep non-ASCII/verbatim content.
