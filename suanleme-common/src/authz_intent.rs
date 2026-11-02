@@ -11,7 +11,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::authz::{ExecutionContext, Id, ProjectContext, RequestSubject, UuidText};
 use crate::authz_transition::TransitionExecutionContext;
-use crate::business::{CommonRequest, Merchant, Tenant};
+use crate::business::{CommonRequest, Merchant, ResourceGroupAccess, Tenant};
 
 /// Wire protocol discriminator for [`AuthorizationIntent`].
 pub const AUTHORIZATION_INTENT_PROTOCOL: u16 = 1;
@@ -78,6 +78,8 @@ struct AuthorizationRequestWire<T> {
     #[serde(default)]
     resource_group_id: Option<Id>,
     #[serde(default)]
+    resource_group_access: Option<ResourceGroupAccess>,
+    #[serde(default)]
     authorization_intent: Option<AuthorizationIntent>,
     #[serde(default)]
     auth_context: Option<ExecutionContext>,
@@ -102,10 +104,12 @@ impl<T: Serialize> Serialize for AuthorizationRequest<T> {
             timestamp: _,
             data: _,
             resource_group_id: _,
+            resource_group_access: _,
             auth_context: _,
             transition_auth_context: _,
         } = request;
         let optional_fields = usize::from(request.resource_group_id.is_some())
+            + usize::from(request.resource_group_access.is_some())
             + usize::from(self.authorization_intent.is_some())
             + usize::from(request.auth_context.is_some())
             + usize::from(request.transition_auth_context.is_some());
@@ -120,6 +124,9 @@ impl<T: Serialize> Serialize for AuthorizationRequest<T> {
         map.serialize_entry("data", &request.data)?;
         if let Some(resource_group_id) = &request.resource_group_id {
             map.serialize_entry("resource_group_id", resource_group_id)?;
+        }
+        if let Some(resource_group_access) = &request.resource_group_access {
+            map.serialize_entry("resource_group_access", resource_group_access)?;
         }
         if let Some(intent) = &self.authorization_intent {
             map.serialize_entry("authorization_intent", intent)?;
@@ -151,6 +158,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for AuthorizationRequest<T> {
                 timestamp: wire.timestamp,
                 data: wire.data,
                 resource_group_id: wire.resource_group_id,
+                resource_group_access: wire.resource_group_access,
                 auth_context: wire.auth_context,
                 transition_auth_context: wire.transition_auth_context,
             },

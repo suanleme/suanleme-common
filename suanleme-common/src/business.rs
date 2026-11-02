@@ -2,6 +2,54 @@ use suanleme_macro::Data;
 
 use crate::utils::date_util::get_now_date_time_as_millis;
 
+/// Project scope selected by the request and allowed by IAM for this exact action.
+///
+/// This is trusted envelope metadata injected by the gateway. It deliberately contains only
+/// project IDs: business data stays in [`CommonRequest::data`], while policy documents, resource
+/// targets and IAM protocol details never enter a business DTO.
+#[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ResourceGroupAccess {
+    /// Optional request-side narrowing. `None` means "all IDs in
+    /// [`Self::resource_group_has_ids`]"; `Some([])` is an explicit empty selection.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_group_ids: Option<Vec<crate::authz::Id>>,
+    /// IDs IAM authorized for the current method/path. An empty vector means no project access.
+    pub resource_group_has_ids: Vec<crate::authz::Id>,
+}
+
+impl ResourceGroupAccess {
+    fn normalized_ids(mut ids: Vec<crate::authz::Id>) -> Vec<crate::authz::Id> {
+        ids.sort_unstable();
+        ids.dedup();
+        ids
+    }
+
+    /// Return a canonical copy with both ID sets sorted and deduplicated.
+    pub fn normalized(&self) -> Self {
+        Self {
+            resource_group_ids: self.resource_group_ids.clone().map(Self::normalized_ids),
+            resource_group_has_ids: Self::normalized_ids(self.resource_group_has_ids.clone()),
+        }
+    }
+
+    /// Effective project IDs for the business operation.
+    ///
+    /// No request-side selection means every authorized ID. An explicit selection is intersected
+    /// with the authorized set; callers never need to interpret IAM policy data themselves.
+    pub fn effective_ids(&self) -> Vec<crate::authz::Id> {
+        let normalized = self.normalized();
+        let Some(requested) = normalized.resource_group_ids else {
+            return normalized.resource_group_has_ids;
+        };
+        let authorized = normalized.resource_group_has_ids;
+        requested
+            .into_iter()
+            .filter(|id| authorized.binary_search(id).is_ok())
+            .collect()
+    }
+}
+
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, Data)]
 pub struct CommonRequest<T> {
     pub version: Option<String>,
@@ -15,6 +63,10 @@ pub struct CommonRequest<T> {
     /// Single-project compatibility projection; never a substitute for V2 context.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub resource_group_id: Option<crate::authz::Id>,
+    /// Gateway-injected action-specific project scope. `None` keeps the legacy request path;
+    /// `Some` always denotes IAM mode, including an empty authorized set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_group_access: Option<ResourceGroupAccess>,
     /// Trusted-channel transport only; deserialization does not authenticate it.
     /// V2 execution context (`protocol = 2`); never used for the C1 transition package.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -48,6 +100,7 @@ impl<T> CommonRequest<T> {
             timestamp,
             data,
             resource_group_id,
+            resource_group_access,
             auth_context,
             transition_auth_context,
         } = self;
@@ -61,6 +114,7 @@ impl<T> CommonRequest<T> {
             timestamp,
             data: data.map(map),
             resource_group_id,
+            resource_group_access,
             auth_context,
             transition_auth_context,
         }
@@ -133,6 +187,7 @@ impl<T> Default for CommonRequest<T> {
             timestamp: get_now_date_time_as_millis(),
             data: None,
             resource_group_id: None,
+            resource_group_access: None,
             auth_context: None,
             transition_auth_context: None,
         }
@@ -152,7 +207,7 @@ impl<T> Default for CommonResponse<T> {
 #[cfg(test)]
 mod project_protocol_tests {
     use super::*;
-    use crate::authz::{project_protocol_tests::context_json, VisibilityState};
+    use crate::authz::{project_protocol_tests::context_json, Id, VisibilityState};
     use serde_json::json;
 
     fn transition_auth_state_json() -> serde_json::Value {
@@ -189,6 +244,7 @@ mod project_protocol_tests {
             "token":"t","sign_str":"s","timestamp":1,"data":"payload"
         })).unwrap();
         assert!(request.resource_group_id.is_none());
+        assert!(request.resource_group_access.is_none());
         assert!(request.auth_context.is_none());
         assert_eq!(request.user_id, Some(7));
         let tenant = request.tenant.unwrap();
@@ -198,7 +254,8 @@ mod project_protocol_tests {
         assert!(tenant.visible_project_ids.is_empty());
         assert!(tenant.visibility_version.is_none() && tenant.visibility_lease.is_none());
         let default = CommonRequest::<String>::default();
-        assert!(default.resource_group_id.is_none() && default.auth_context.is_none());
+        assert!(default.resource_group_id.is_none() && default.resource_group_access.is_none());
+        assert!(default.auth_context.is_none());
         assert!(default.transition_auth_context.is_none());
         assert_eq!(
             Tenant::default().visibility_state,
@@ -218,7 +275,10 @@ mod project_protocol_tests {
                 "is_admin":false,"visible_project_ids":["16","9223372036854775807"],"scope_all":false,
                 "visibility_state":"ready","visibility_version":context_json()["version"],"visibility_lease":context_json()["lease"]},
             "token":"request-token","sign_str":"signature","timestamp":123456789,
-            "data":"move-only","resource_group_id":"16","auth_context":context_json(),
+            "data":"move-only","resource_group_id":"16",
+            "resource_group_access":{"resource_group_ids":["16","8","16"],
+                "resource_group_has_ids":["8","16","8"]},
+            "auth_context":context_json(),
             "transition_auth_context":transition_context_json()
         });
         let request: CommonRequest<MoveOnly> = serde_json::from_value(value.clone()).unwrap();
@@ -236,8 +296,70 @@ mod project_protocol_tests {
             request.map_data(|_| panic!("None must not call converter"));
         assert!(result.data.is_none());
         assert_eq!(result.timestamp, before);
-        assert!(result.resource_group_id.is_none() && result.auth_context.is_none());
+        assert!(result.resource_group_id.is_none() && result.resource_group_access.is_none());
+        assert!(result.auth_context.is_none());
         assert!(result.transition_auth_context.is_none());
+    }
+
+    #[test]
+    fn resource_group_access_normalizes_and_intersects_without_ambiguous_none() {
+        let id = |value| Id::new(value).unwrap();
+        let access = ResourceGroupAccess {
+            resource_group_ids: Some(vec![id(9), id(3), id(9), id(7)]),
+            resource_group_has_ids: vec![id(7), id(5), id(3), id(5)],
+        };
+        assert_eq!(
+            access.normalized(),
+            ResourceGroupAccess {
+                resource_group_ids: Some(vec![id(3), id(7), id(9)]),
+                resource_group_has_ids: vec![id(3), id(5), id(7)],
+            }
+        );
+        assert_eq!(access.effective_ids(), vec![id(3), id(7)]);
+
+        let all_authorized = ResourceGroupAccess {
+            resource_group_ids: None,
+            resource_group_has_ids: vec![id(7), id(3), id(7)],
+        };
+        assert_eq!(all_authorized.effective_ids(), vec![id(3), id(7)]);
+
+        let empty_authorized = ResourceGroupAccess {
+            resource_group_ids: None,
+            resource_group_has_ids: Vec::new(),
+        };
+        assert!(empty_authorized.effective_ids().is_empty());
+    }
+
+    #[test]
+    fn resource_group_access_is_optional_but_strict_when_present() {
+        let legacy: CommonRequest<String> = serde_json::from_value(json!({
+            "version":null,"user_id":7,"merchant":null,"tenant":null,
+            "token":null,"sign_str":null,"timestamp":1,"data":"payload"
+        }))
+        .unwrap();
+        assert!(legacy.resource_group_access.is_none());
+        assert!(serde_json::to_value(legacy)
+            .unwrap()
+            .get("resource_group_access")
+            .is_none());
+
+        let access: ResourceGroupAccess = serde_json::from_value(json!({
+            "resource_group_ids":["9","3"],
+            "resource_group_has_ids":["3","5","9"]
+        }))
+        .unwrap();
+        assert_eq!(
+            access.effective_ids(),
+            vec![Id::new(3).unwrap(), Id::new(9).unwrap()]
+        );
+        assert!(serde_json::from_value::<ResourceGroupAccess>(json!({
+            "resource_group_has_ids":[],"unknown":true
+        }))
+        .is_err());
+        assert!(serde_json::from_value::<ResourceGroupAccess>(json!({
+            "resource_group_ids":[]
+        }))
+        .is_err());
     }
 
     #[test]
@@ -251,10 +373,15 @@ mod project_protocol_tests {
         });
         let request: CommonRequest<String> = serde_json::from_value(legacy.clone()).unwrap();
         assert!(request.transition_auth_context.is_none());
+        assert!(request.resource_group_access.is_none());
         let serialized = serde_json::to_value(&request).unwrap();
         assert!(
             serialized.get("transition_auth_context").is_none(),
             "None must not add the key"
+        );
+        assert!(
+            serialized.get("resource_group_access").is_none(),
+            "legacy requests must not gain the project-access key"
         );
         // Existing fields keep their original line format (display-only Tenant fields
         // added by the same local patch always serialize; that is not this channel).
