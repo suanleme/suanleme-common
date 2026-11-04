@@ -5,8 +5,8 @@ use crate::utils::date_util::get_now_date_time_as_millis;
 /// Project scope selected by the request and allowed by IAM for this exact action.
 ///
 /// This is trusted envelope metadata injected by the gateway. It deliberately contains only
-/// project IDs: business data stays in [`CommonRequest::data`], while policy documents, resource
-/// targets and IAM protocol details never enter a business DTO.
+/// project IDs and ungrouped visibility: business data stays in [`CommonRequest::data`], while
+/// policy documents, resource targets and IAM protocol details never enter a business DTO.
 #[derive(Debug, Default, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ResourceGroupAccess {
@@ -16,6 +16,14 @@ pub struct ResourceGroupAccess {
     pub resource_group_ids: Option<Vec<crate::authz::Id>>,
     /// IDs IAM authorized for the current method/path. An empty vector means no project access.
     pub resource_group_has_ids: Vec<crate::authz::Id>,
+    /// Whether IAM allows ungrouped resources for this action. Only an all-projects request can
+    /// use this permission; a project selection always excludes ungrouped resources.
+    #[serde(default, skip_serializing_if = "is_false")]
+    pub ungrouped_resource_allowed: bool,
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
 }
 
 impl ResourceGroupAccess {
@@ -30,7 +38,13 @@ impl ResourceGroupAccess {
         Self {
             resource_group_ids: self.resource_group_ids.clone().map(Self::normalized_ids),
             resource_group_has_ids: Self::normalized_ids(self.resource_group_has_ids.clone()),
+            ungrouped_resource_allowed: self.ungrouped_resource_allowed,
         }
+    }
+
+    /// Ungrouped visibility applies only when the request selects all authorized projects.
+    pub fn allows_ungrouped(&self) -> bool {
+        self.resource_group_ids.is_none() && self.ungrouped_resource_allowed
     }
 
     /// Effective project IDs for the business operation.
@@ -307,12 +321,14 @@ mod project_protocol_tests {
         let access = ResourceGroupAccess {
             resource_group_ids: Some(vec![id(9), id(3), id(9), id(7)]),
             resource_group_has_ids: vec![id(7), id(5), id(3), id(5)],
+            ungrouped_resource_allowed: false,
         };
         assert_eq!(
             access.normalized(),
             ResourceGroupAccess {
                 resource_group_ids: Some(vec![id(3), id(7), id(9)]),
                 resource_group_has_ids: vec![id(3), id(5), id(7)],
+                ungrouped_resource_allowed: false,
             }
         );
         assert_eq!(access.effective_ids(), vec![id(3), id(7)]);
@@ -320,14 +336,50 @@ mod project_protocol_tests {
         let all_authorized = ResourceGroupAccess {
             resource_group_ids: None,
             resource_group_has_ids: vec![id(7), id(3), id(7)],
+            ungrouped_resource_allowed: false,
         };
         assert_eq!(all_authorized.effective_ids(), vec![id(3), id(7)]);
 
         let empty_authorized = ResourceGroupAccess {
             resource_group_ids: None,
             resource_group_has_ids: Vec::new(),
+            ungrouped_resource_allowed: false,
         };
         assert!(empty_authorized.effective_ids().is_empty());
+    }
+
+    #[test]
+    fn ungrouped_permission_requires_all_projects_and_defaults_to_false() {
+        let old: ResourceGroupAccess = serde_json::from_value(json!({
+            "resource_group_has_ids": []
+        }))
+        .unwrap();
+        assert!(!old.allows_ungrouped());
+        assert!(serde_json::to_value(&old)
+            .unwrap()
+            .get("ungrouped_resource_allowed")
+            .is_none());
+
+        let mut access = ResourceGroupAccess {
+            ungrouped_resource_allowed: true,
+            ..old
+        };
+        assert!(access.allows_ungrouped());
+        assert!(access.normalized().allows_ungrouped());
+        assert_eq!(
+            serde_json::to_value(&access).unwrap()["ungrouped_resource_allowed"],
+            json!(true)
+        );
+        access.resource_group_ids = Some(Vec::new());
+        assert!(
+            !access.allows_ungrouped(),
+            "explicit empty selection is not all projects"
+        );
+        access.resource_group_ids = Some(vec![Id::new(3).unwrap()]);
+        assert!(
+            !access.allows_ungrouped(),
+            "a selected project excludes ungrouped resources"
+        );
     }
 
     #[test]
