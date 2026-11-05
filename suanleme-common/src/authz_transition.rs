@@ -25,11 +25,12 @@
 //!
 //! ## Replacement condition
 //!
-//! Replace this protocol (and [`crate::business::CommonRequest::auth_context`]'s
-//! transition variant) with the V2 types only after the V2 epoch/persistent-token
-//! rollout actually exists and both the gateway and every business guard consume it.
-//! Until then any cache entry, request digest or context produced under this schema is
-//! scoped to schema 1 and must not be treated as V2 (and vice versa).
+//! This standalone protocol is not a field of [`crate::business::CommonRequest`]; the
+//! current V4 gateway forwards [`crate::business::ResourceGroupAccess`] instead.
+//! Consumers of this protocol must not replace it with V2 types until their V2
+//! epoch/persistent-token rollout exists. Any cache entry, request digest or context
+//! produced under this schema is scoped to schema 1 and must not be treated as V2
+//! (and vice versa).
 //!
 //! ## Trust
 //!
@@ -194,7 +195,7 @@ impl TryFrom<TransitionQueryConstraintWire> for TransitionQueryConstraint {
     }
 }
 
-/// Trusted execution context injected by the gateway for this transition package.
+/// Standalone trusted-channel execution context for this transition protocol.
 ///
 /// Field-by-field mirror of [`crate::authz::ExecutionContext`] except:
 /// * `protocol` is the explicit transition value [`TRANSITION_PROTOCOL`] (1), not the V2
@@ -312,9 +313,8 @@ impl fmt::Display for TransitionAuthState {
     }
 }
 
-/// The transition envelope is the only value carried by
-/// [`crate::business::CommonRequest::auth_context`] in this package: a V2
-/// [`crate::authz::ExecutionContext`] must never be silently coerced into it.
+/// Serialize the standalone transition envelope. A V2 [`crate::authz::ExecutionContext`]
+/// must never be silently coerced into it.
 impl From<TransitionExecutionContext> for serde_json::Value {
     fn from(value: TransitionExecutionContext) -> Self {
         // Serialization of the validated struct cannot fail.
@@ -322,12 +322,11 @@ impl From<TransitionExecutionContext> for serde_json::Value {
     }
 }
 
-/// Helper: extract the transition context injected in a `CommonRequest`, if any.
+/// Decode a standalone transition context from its JSON value.
 ///
-/// This does not authenticate anything; it only avoids every consumer re-implementing
-/// the (currently deliberately failing) conversion from the V2-typed field. The
-/// gateway injects via raw JSON, services must parse their own `CommonRequest` with
-/// the transition envelope.
+/// This validates the protocol's wire shape, without authenticating its source.
+/// `CommonRequest` does not carry this context; its V4 project-access envelope uses
+/// [`crate::business::ResourceGroupAccess`].
 pub fn transition_context_from_json(
     value: &serde_json::Value,
 ) -> Result<TransitionExecutionContext, &'static str> {

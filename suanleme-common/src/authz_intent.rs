@@ -1,16 +1,14 @@
-//! Product-neutral authorization intent carried from the gateway to a business service.
+//! Independent authorization-intent protocol and optional request wrapper.
 //!
-//! The gateway authenticates the caller and selects IAM, then forwards this small intent with
-//! the normal business request. The owning service resolves real resources from its own DTO and
-//! data, asks IAM for the decision, and only then executes or filters the request. This value is
-//! therefore neither an authorization result nor a capability; deserialization alone does not
-//! authenticate its source or permit the operation.
+//! These types remain available to consumers of the intent protocol. The current V4 gateway
+//! instead forwards [`ResourceGroupAccess`] in [`CommonRequest`]. An intent is neither an
+//! authorization result nor a capability; deserialization alone does not authenticate its source
+//! or permit the operation.
 
 use serde::ser::SerializeMap;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::authz::{ExecutionContext, Id, ProjectContext, RequestSubject, UuidText};
-use crate::authz_transition::TransitionExecutionContext;
+use crate::authz::{ProjectContext, RequestSubject, UuidText};
 use crate::business::{CommonRequest, Merchant, ResourceGroupAccess, Tenant};
 
 /// Wire protocol discriminator for [`AuthorizationIntent`].
@@ -55,10 +53,8 @@ impl AuthorizationIntent {
 
 /// Backward-compatible POST envelope for routes that support service-local authorization.
 ///
-/// The existing [`CommonRequest`] stays byte-compatible for the rest of the platform. Enrolled
-/// handlers opt into this wrapper; its flattened wire shape accepts every legacy request unchanged
-/// and adds only the optional gateway-to-service intent. This avoids forcing unrelated interface
-/// crates onto a second `CommonRequest` type.
+/// Its flattened wire shape shares the minimal [`CommonRequest`] and adds only the optional
+/// intent. Removed envelope fields are ignored on input and are not retained or forwarded.
 #[derive(Debug, Clone)]
 pub struct AuthorizationRequest<T> {
     pub envelope: CommonRequest<T>,
@@ -76,15 +72,9 @@ struct AuthorizationRequestWire<T> {
     timestamp: u128,
     data: Option<T>,
     #[serde(default)]
-    resource_group_id: Option<Id>,
-    #[serde(default)]
     resource_group_access: Option<ResourceGroupAccess>,
     #[serde(default)]
     authorization_intent: Option<AuthorizationIntent>,
-    #[serde(default)]
-    auth_context: Option<ExecutionContext>,
-    #[serde(default)]
-    transition_auth_context: Option<TransitionExecutionContext>,
 }
 
 impl<T: Serialize> Serialize for AuthorizationRequest<T> {
@@ -103,16 +93,10 @@ impl<T: Serialize> Serialize for AuthorizationRequest<T> {
             sign_str: _,
             timestamp: _,
             data: _,
-            resource_group_id: _,
             resource_group_access: _,
-            auth_context: _,
-            transition_auth_context: _,
         } = request;
-        let optional_fields = usize::from(request.resource_group_id.is_some())
-            + usize::from(request.resource_group_access.is_some())
-            + usize::from(self.authorization_intent.is_some())
-            + usize::from(request.auth_context.is_some())
-            + usize::from(request.transition_auth_context.is_some());
+        let optional_fields = usize::from(request.resource_group_access.is_some())
+            + usize::from(self.authorization_intent.is_some());
         let mut map = serializer.serialize_map(Some(8 + optional_fields))?;
         map.serialize_entry("version", &request.version)?;
         map.serialize_entry("user_id", &request.user_id)?;
@@ -122,20 +106,11 @@ impl<T: Serialize> Serialize for AuthorizationRequest<T> {
         map.serialize_entry("sign_str", &request.sign_str)?;
         map.serialize_entry("timestamp", &request.timestamp)?;
         map.serialize_entry("data", &request.data)?;
-        if let Some(resource_group_id) = &request.resource_group_id {
-            map.serialize_entry("resource_group_id", resource_group_id)?;
-        }
         if let Some(resource_group_access) = &request.resource_group_access {
             map.serialize_entry("resource_group_access", resource_group_access)?;
         }
         if let Some(intent) = &self.authorization_intent {
             map.serialize_entry("authorization_intent", intent)?;
-        }
-        if let Some(context) = &request.auth_context {
-            map.serialize_entry("auth_context", context)?;
-        }
-        if let Some(context) = &request.transition_auth_context {
-            map.serialize_entry("transition_auth_context", context)?;
         }
         map.end()
     }
@@ -157,10 +132,7 @@ impl<'de, T: Deserialize<'de>> Deserialize<'de> for AuthorizationRequest<T> {
                 sign_str: wire.sign_str,
                 timestamp: wire.timestamp,
                 data: wire.data,
-                resource_group_id: wire.resource_group_id,
                 resource_group_access: wire.resource_group_access,
-                auth_context: wire.auth_context,
-                transition_auth_context: wire.transition_auth_context,
             },
             authorization_intent: wire.authorization_intent,
         })
@@ -300,6 +272,65 @@ mod tests {
     }
 
     #[test]
+    fn post_wrapper_round_trips_rga_and_legacy_tenant() {
+        let value = json!({
+            "version":"1","user_id":7,"merchant":null,
+            "tenant": {
+                "tenant_id":4,"tenant_type":"team","tenant_name":"Team",
+                "permission":"legacy","is_admin":false
+            },
+            "token":null,"sign_str":null,"timestamp":1,"data":{"task_id":9},
+            "resource_group_access": {
+                "resource_group_ids":["16"],"resource_group_has_ids":["16","17"]
+            },
+            "authorization_intent": intent(None)
+        });
+        let decoded: AuthorizationRequest<serde_json::Value> =
+            serde_json::from_value(value.clone()).unwrap();
+        assert_eq!(serde_json::to_value(&decoded).unwrap(), value);
+        let (envelope, intent) = decoded.into_parts();
+        assert!(intent.unwrap().validate().is_ok());
+        assert_eq!(envelope.tenant.unwrap().tenant_id, 4);
+        assert_eq!(
+            envelope.resource_group_access.unwrap().effective_ids(),
+            vec![Id::new(16).unwrap()]
+        );
+    }
+
+    #[test]
+    fn post_wrapper_drops_removed_metadata_without_changing_business_data() {
+        let expected = json!({
+            "version":"1","user_id":7,"merchant":null,
+            "tenant": {
+                "tenant_id":4,"tenant_type":"team","tenant_name":"Team",
+                "permission":"legacy","is_admin":false
+            },
+            "token":null,"sign_str":null,"timestamp":1,
+            "data":{"auth_context":{"business":"keep"},"resource_group_id":9},
+            "resource_group_access":{"resource_group_has_ids":[]},
+            "authorization_intent":intent(None)
+        });
+        let mut obsolete = expected.clone();
+        // These are no longer protocol fields, even when their old shapes are invalid.
+        obsolete["resource_group_id"] = json!({"obsolete":true});
+        obsolete["auth_context"] = json!({"obsolete":true});
+        obsolete["transition_auth_context"] = json!({"obsolete":true});
+        for field in [
+            "visible_project_ids",
+            "scope_all",
+            "visibility_state",
+            "visibility_version",
+            "visibility_lease",
+        ] {
+            obsolete["tenant"][field] = json!({"obsolete":true});
+        }
+        let decoded: AuthorizationRequest<serde_json::Value> =
+            serde_json::from_value(obsolete).unwrap();
+        assert!(decoded.resource_group_access.is_some());
+        assert_eq!(serde_json::to_value(decoded).unwrap(), expected);
+    }
+
+    #[test]
     fn post_wrapper_round_trips_intent_without_changing_common_request() {
         let value = json!({
             "version":"1","user_id":7,"merchant":null,"tenant":null,
@@ -333,10 +364,25 @@ mod tests {
         let mut request = AuthorizationRequest::<String>::default();
         request.envelope.timestamp = 7;
         request.envelope.data = Some("9".to_owned());
+        request.envelope.tenant = Some(Tenant {
+            tenant_id: 4,
+            tenant_type: "team".to_owned(),
+            tenant_name: "Team".to_owned(),
+            permission: "legacy".to_owned(),
+            is_admin: false,
+        });
+        let access = ResourceGroupAccess {
+            resource_group_ids: Some(vec![Id::new(16).unwrap()]),
+            resource_group_has_ids: vec![Id::new(16).unwrap()],
+            ungrouped_resource_allowed: false,
+        };
+        request.envelope.resource_group_access = Some(access.clone());
         request.authorization_intent = Some(intent(None));
         let mapped = request.map_data(|value| value.parse::<i64>().unwrap());
         assert_eq!(mapped.envelope.timestamp, 7);
         assert_eq!(mapped.envelope.data, Some(9));
+        assert_eq!(mapped.envelope.tenant.unwrap().tenant_name, "Team");
+        assert_eq!(mapped.envelope.resource_group_access, Some(access));
         assert!(mapped.authorization_intent.is_some());
     }
 }
