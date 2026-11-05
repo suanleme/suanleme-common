@@ -25,11 +25,12 @@
 //!
 //! ## Replacement condition
 //!
-//! Replace this protocol (and [`crate::business::CommonRequest::auth_context`]'s
-//! transition variant) with the V2 types only after the V2 epoch/persistent-token
-//! rollout actually exists and both the gateway and every business guard consume it.
-//! Until then any cache entry, request digest or context produced under this schema is
-//! scoped to schema 1 and must not be treated as V2 (and vice versa).
+//! This standalone protocol is not a field of [`crate::business::CommonRequest`]; the
+//! current V4 gateway forwards [`crate::business::ResourceGroupAccess`] instead.
+//! Consumers of this protocol must not replace it with V2 types until their V2
+//! epoch/persistent-token rollout exists. Any cache entry, request digest or context
+//! produced under this schema is scoped to schema 1 and must not be treated as V2
+//! (and vice versa).
 //!
 //! ## Trust
 //!
@@ -194,7 +195,7 @@ impl TryFrom<TransitionQueryConstraintWire> for TransitionQueryConstraint {
     }
 }
 
-/// Trusted execution context injected by the gateway for this transition package.
+/// Standalone trusted-channel execution context for this transition protocol.
 ///
 /// Field-by-field mirror of [`crate::authz::ExecutionContext`] except:
 /// * `protocol` is the explicit transition value [`TRANSITION_PROTOCOL`] (1), not the V2
@@ -312,9 +313,8 @@ impl fmt::Display for TransitionAuthState {
     }
 }
 
-/// The transition envelope is the only value carried by
-/// [`crate::business::CommonRequest::auth_context`] in this package: a V2
-/// [`crate::authz::ExecutionContext`] must never be silently coerced into it.
+/// Serialize the standalone transition envelope. A V2 [`crate::authz::ExecutionContext`]
+/// must never be silently coerced into it.
 impl From<TransitionExecutionContext> for serde_json::Value {
     fn from(value: TransitionExecutionContext) -> Self {
         // Serialization of the validated struct cannot fail.
@@ -322,12 +322,11 @@ impl From<TransitionExecutionContext> for serde_json::Value {
     }
 }
 
-/// Helper: extract the transition context injected in a `CommonRequest`, if any.
+/// Decode a standalone transition context from its JSON value.
 ///
-/// This does not authenticate anything; it only avoids every consumer re-implementing
-/// the (currently deliberately failing) conversion from the V2-typed field. The
-/// gateway injects via raw JSON, services must parse their own `CommonRequest` with
-/// the transition envelope.
+/// This validates the protocol's wire shape, without authenticating its source.
+/// `CommonRequest` does not carry this context; its V4 project-access envelope uses
+/// [`crate::business::ResourceGroupAccess`].
 pub fn transition_context_from_json(
     value: &serde_json::Value,
 ) -> Result<TransitionExecutionContext, &'static str> {
@@ -403,7 +402,10 @@ mod tests {
             ("epoch", json!("22222222-2222-4222-8222-222222222222")),
             ("cache_protocol", json!(2)),
             ("version", json!({"cache_protocol":2})),
-            ("lease", json!({"source_started_at_unix_ms":1,"source_expires_at_unix_ms":2})),
+            (
+                "lease",
+                json!({"source_started_at_unix_ms":1,"source_expires_at_unix_ms":2}),
+            ),
             ("scope_all", json!(true)),
         ] {
             let mut candidate = context_json();
@@ -457,7 +459,10 @@ mod tests {
             "source_expires_at_unix_ms",
         ] {
             let mut candidate = context_json();
-            candidate["auth_state"].as_object_mut().unwrap().remove(field);
+            candidate["auth_state"]
+                .as_object_mut()
+                .unwrap()
+                .remove(field);
             assert!(
                 serde_json::from_value::<TransitionExecutionContext>(candidate).is_err(),
                 "missing auth_state.{field}"
@@ -490,13 +495,7 @@ mod tests {
         let boundary = TransitionAuthState::new(0, 0, 7, 7).unwrap();
         assert!(boundary.is_expired(7));
         assert!(TransitionAuthState::new(0, 0, 8, 7).is_err());
-        assert!(TransitionAuthState::new(
-            0,
-            0,
-            0,
-            MAX_SAFE_INTEGER
-        )
-        .is_ok());
+        assert!(TransitionAuthState::new(0, 0, 0, MAX_SAFE_INTEGER).is_ok());
     }
 
     #[test]
@@ -516,7 +515,13 @@ mod tests {
         assert!(!parsed.public_bypass);
         assert!(parsed.allow_clauses.is_empty());
         assert_eq!(serde_json::to_value(&parsed).unwrap(), value);
-        for field in ["selected_scope", "public_bypass", "allow_clauses", "deny_clauses", "auth_state"] {
+        for field in [
+            "selected_scope",
+            "public_bypass",
+            "allow_clauses",
+            "deny_clauses",
+            "auth_state",
+        ] {
             let mut candidate = value.clone();
             candidate.as_object_mut().unwrap().remove(field);
             assert!(
@@ -526,7 +531,10 @@ mod tests {
         }
         for (field, payload) in [
             ("version", json!({"cache_protocol":2})),
-            ("lease", json!({"source_started_at_unix_ms":1,"source_expires_at_unix_ms":2})),
+            (
+                "lease",
+                json!({"source_started_at_unix_ms":1,"source_expires_at_unix_ms":2}),
+            ),
             ("epoch", json!("22222222-2222-4222-8222-222222222222")),
         ] {
             let mut candidate = value.clone();
@@ -553,8 +561,7 @@ mod tests {
                 "{pointer}"
             );
         }
-        let context: TransitionExecutionContext =
-            serde_json::from_value(context_json()).unwrap();
+        let context: TransitionExecutionContext = serde_json::from_value(context_json()).unwrap();
         assert_eq!(context.protocol, TRANSITION_PROTOCOL);
         assert!(context.query_constraint.is_none());
         let expires = context.auth_state.source_expires_at_unix_ms;

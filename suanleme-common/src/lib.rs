@@ -1,5 +1,8 @@
 pub mod authz;
 pub mod authz_digest;
+pub mod authz_exec;
+pub mod authz_intent;
+pub mod authz_revoke;
 pub mod authz_transition;
 pub mod business;
 pub mod config;
